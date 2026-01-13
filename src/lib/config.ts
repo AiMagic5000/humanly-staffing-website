@@ -90,8 +90,14 @@ export const navigation = {
         { name: "Case Studies", href: "/employers/case-studies" }
       ]
     },
-    { name: "Blog", href: "/blog" },
-    { name: "Contact", href: "/contact" }
+    {
+      name: "Contact",
+      href: "/contact",
+      children: [
+        { name: "Contact Us", href: "/contact" },
+        { name: "Blog", href: "/blog" }
+      ]
+    }
   ],
   footer: {
     services: [

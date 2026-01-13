@@ -96,12 +96,15 @@ export function Header() {
         </div>
 
         {/* Desktop CTA buttons */}
-        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
-          <Button asChild size="sm">
-            <Link href="/employers/request-talent">Hire Talent</Link>
-          </Button>
+        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-3">
           <Button asChild variant="outline" size="sm">
             <Link href="/jobs">Find Jobs</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/sign-in">Login</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/employers/request-talent">Hire Talent</Link>
           </Button>
         </div>
       </nav>
@@ -179,6 +182,11 @@ export function Header() {
                     ))}
                   </div>
                   <div className="py-6 space-y-3">
+                    <Button asChild className="w-full">
+                      <Link href="/sign-in" onClick={() => setMobileMenuOpen(false)}>
+                        Login
+                      </Link>
+                    </Button>
                     <Button asChild className="w-full">
                       <Link href="/employers/request-talent" onClick={() => setMobileMenuOpen(false)}>
                         Hire Talent
