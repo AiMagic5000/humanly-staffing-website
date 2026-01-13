@@ -13,12 +13,12 @@ import {
   Settings,
   Menu,
   X,
-  Bell,
   Shield,
   BarChart3,
   Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -123,10 +123,7 @@ export default function AdminLayout({
               <Mail className="w-5 h-5 text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
             </button>
-            <button className="relative p-2 rounded-lg hover:bg-gray-100">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <NotificationDropdown />
           </div>
         </header>
 
