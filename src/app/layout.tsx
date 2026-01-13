@@ -56,6 +56,42 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  other: {
+    "ai-content-declaration": "human-created",
+  },
+};
+
+// Schema.org JSON-LD structured data
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Humanly Staffing",
+  url: "https://humanlystaffing.com",
+  logo: "https://humanlystaffing.com/logo.png",
+  description: "Premier enterprise staffing and recruitment platform connecting top talent with leading employers.",
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "+1-307-555-0100",
+    contactType: "customer service",
+    areaServed: "US",
+    availableLanguage: "English",
+  },
+  sameAs: [
+    "https://linkedin.com/company/humanlystaffing",
+    "https://twitter.com/humanlystaffing",
+  ],
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Humanly Staffing",
+  url: "https://humanlystaffing.com",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://humanlystaffing.com/jobs?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
 };
 
 export default function RootLayout({
@@ -66,6 +102,16 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={inter.variable}>
+        <head>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+          />
+        </head>
         <body className="min-h-screen bg-white font-sans antialiased">
           <Header />
           <main>{children}</main>
