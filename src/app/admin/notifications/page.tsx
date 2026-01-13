@@ -231,11 +231,7 @@ export default function AdminNotificationsPage() {
   };
 
   const clearResolved = async () => {
-    // Optimistic update
-    const resolvedIds = notifications
-      .filter(n => !n.actionRequired && n.read)
-      .map(n => n.id);
-
+    // Optimistic update - filter out resolved notifications
     setNotifications(notifications.filter((n) => n.actionRequired || !n.read));
 
     try {

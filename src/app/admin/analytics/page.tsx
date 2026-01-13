@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -77,11 +77,7 @@ export default function AdminAnalyticsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState("30d");
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [period]);
-
-  const fetchAnalytics = async (showToast = false) => {
+  const fetchAnalytics = useCallback(async (showToast = false) => {
     try {
       if (showToast) setRefreshing(true);
 
@@ -105,7 +101,11 @@ export default function AdminAnalyticsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
