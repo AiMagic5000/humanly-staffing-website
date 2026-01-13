@@ -125,6 +125,31 @@ export function Footer() {
               ))}
             </ul>
 
+            {/* Account Login */}
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
+                Account Login
+              </h3>
+              <ul className="mt-4 space-y-3">
+                <li>
+                  <Link
+                    href="/sign-in"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Employee Login
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/sign-in"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Employer Login
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
             {/* Newsletter */}
             <div className="mt-8">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
