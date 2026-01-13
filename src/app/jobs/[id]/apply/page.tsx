@@ -131,27 +131,30 @@ export default function ApplyPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // In production, this would:
-      // 1. Upload resume to storage
-      // 2. Create application in database
-      // 3. Send confirmation email
-      // 4. Notify employer
-
-      console.log("Application submitted:", {
-        ...data,
-        jobId: job.id,
-        resume: resumeFile?.name,
-        userId: user?.id,
+      // Submit application to API
+      const response = await fetch("/api/applications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobId: job.id,
+          ...data,
+          resumeUrl: resumeFile ? `resume_${Date.now()}_${resumeFile.name}` : undefined,
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to submit application");
+      }
 
       setIsComplete(true);
       toast.success("Application submitted successfully!");
     } catch (error) {
       console.error("Error submitting application:", error);
-      toast.error("Failed to submit application. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to submit application. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

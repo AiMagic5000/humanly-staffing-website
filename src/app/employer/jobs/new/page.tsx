@@ -161,17 +161,26 @@ export default function NewJobPage() {
     setIsSubmitting(true);
 
     try {
-      // In production, this would POST to the API
-      console.log("Job posting data:", data);
+      // Submit job to API
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to post job");
+      }
 
       toast.success("Job posted successfully!");
       router.push("/employer/jobs");
     } catch (error) {
       console.error("Error posting job:", error);
-      toast.error("Failed to post job. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to post job. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
