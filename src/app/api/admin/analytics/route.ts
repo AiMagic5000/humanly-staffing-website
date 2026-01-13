@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { auth } from "@clerk/nextjs/server";
+import { requireAdmin } from "@/lib/auth";
 
 // Demo analytics data for fallback
 const demoAnalytics = {
@@ -132,18 +132,8 @@ const demoAnalytics = {
 
 export async function GET() {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // TODO: Add admin role verification here
-    // For now, we'll allow any authenticated user to access admin analytics
-    // In production, you should check if the user has admin privileges
+    // Verify admin access
+    await requireAdmin();
 
     // Try to fetch real analytics from Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -196,9 +186,11 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Admin analytics error:", error);
+    const message = error instanceof Error ? error.message : "Failed to fetch analytics";
+    const status = message.includes("Unauthorized") ? 401 : message.includes("Forbidden") ? 403 : 500;
     return NextResponse.json(
-      { success: false, error: "Failed to fetch analytics" },
-      { status: 500 }
+      { success: false, error: message },
+      { status }
     );
   }
 }
