@@ -16,6 +16,7 @@ import {
   Shield,
   BarChart3,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Jobs", href: "/admin/jobs", icon: Briefcase },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Companies", href: "/admin/companies", icon: Building2 },
+  { name: "Messages", href: "/admin/messages", icon: MessageSquare },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
