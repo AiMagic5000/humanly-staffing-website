@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -13,10 +13,12 @@ import {
   Phone,
   Video,
   Info,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -25,156 +27,78 @@ interface Message {
   isOwn: boolean;
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  avatar: string;
+  role: string;
+  company: string;
+  online: boolean;
+}
+
 interface Conversation {
   id: string;
-  contact: {
-    name: string;
-    avatar: string;
-    role: string;
-    company: string;
-    online: boolean;
-  };
+  contact: Contact;
   lastMessage: string;
-  timestamp: string;
+  lastMessageAt: string;
   unread: boolean;
   starred: boolean;
   messages: Message[];
 }
 
-// Mock conversations data
-const mockConversations: Conversation[] = [
-  {
-    id: "1",
-    contact: {
-      name: "Sarah Miller",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-      role: "Senior Recruiter",
-      company: "TechCorp Inc.",
-      online: true,
-    },
-    lastMessage: "Great! I'll send over the interview details shortly.",
-    timestamp: "10:30 AM",
-    unread: true,
-    starred: true,
-    messages: [
-      {
-        id: "m1",
-        content: "Hi! I reviewed your application for the Senior Software Engineer position. Your experience looks impressive!",
-        timestamp: "Yesterday 2:30 PM",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Thank you so much! I'm very excited about this opportunity.",
-        timestamp: "Yesterday 3:15 PM",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Would you be available for a technical interview next week?",
-        timestamp: "Yesterday 4:00 PM",
-        isOwn: false,
-      },
-      {
-        id: "m4",
-        content: "Yes, I'm available Tuesday through Thursday. What time works best for your team?",
-        timestamp: "Yesterday 4:30 PM",
-        isOwn: true,
-      },
-      {
-        id: "m5",
-        content: "Great! I'll send over the interview details shortly.",
-        timestamp: "Today 10:30 AM",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    contact: {
-      name: "James Wilson",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-      role: "HR Manager",
-      company: "StartupXYZ",
-      online: false,
-    },
-    lastMessage: "Thanks for your interest in our Product Manager role.",
-    timestamp: "Yesterday",
-    unread: false,
-    starred: false,
-    messages: [
-      {
-        id: "m1",
-        content: "Hello! I noticed you applied for the Product Manager position at StartupXYZ.",
-        timestamp: "2 days ago",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Yes, I'm very interested in the role. The company's mission really resonates with me.",
-        timestamp: "2 days ago",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Thanks for your interest in our Product Manager role.",
-        timestamp: "Yesterday",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    contact: {
-      name: "Emily Chen",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-      role: "Technical Recruiter",
-      company: "CloudServices Co.",
-      online: true,
-    },
-    lastMessage: "Your DevOps skills are exactly what we're looking for!",
-    timestamp: "Jan 10",
-    unread: false,
-    starred: true,
-    messages: [
-      {
-        id: "m1",
-        content: "Hi there! Your DevOps skills are exactly what we're looking for!",
-        timestamp: "Jan 10",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    contact: {
-      name: "Michael Brown",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-      role: "Engineering Manager",
-      company: "DesignCo",
-      online: false,
-    },
-    lastMessage: "We'd love to schedule a call to discuss the UX Designer position.",
-    timestamp: "Jan 8",
-    unread: false,
-    starred: false,
-    messages: [
-      {
-        id: "m1",
-        content: "We'd love to schedule a call to discuss the UX Designer position.",
-        timestamp: "Jan 8",
-        isOwn: false,
-      },
-    ],
-  },
-];
+function formatTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days === 0) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } else if (days === 1) {
+    return "Yesterday";
+  } else if (days < 7) {
+    return date.toLocaleDateString([], { weekday: "short" });
+  } else {
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+}
 
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState(mockConversations);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [showMobileConversation, setShowMobileConversation] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [selectedConversation?.messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const fetchConversations = async () => {
+    try {
+      const response = await fetch("/api/messages");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setConversations(result.data);
+      }
+    } catch (error) {
+      console.error("Fetch conversations error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredConversations = conversations.filter(
     (conv) =>
@@ -184,58 +108,114 @@ export default function MessagesPage() {
 
   const unreadCount = conversations.filter((c) => c.unread).length;
 
-  const toggleStar = (id: string) => {
-    setConversations(
-      conversations.map((c) =>
-        c.id === id ? { ...c, starred: !c.starred } : c
-      )
-    );
-    if (selectedConversation?.id === id) {
-      setSelectedConversation({
-        ...selectedConversation,
-        starred: !selectedConversation.starred,
+  const toggleStar = async (id: string) => {
+    try {
+      const response = await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id, action: "toggleStar" }),
       });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setConversations(
+          conversations.map((c) =>
+            c.id === id ? { ...c, starred: result.starred } : c
+          )
+        );
+        if (selectedConversation?.id === id) {
+          setSelectedConversation({
+            ...selectedConversation,
+            starred: result.starred,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Toggle star error:", error);
     }
   };
 
-  const selectConversation = (conv: Conversation) => {
+  const selectConversation = async (conv: Conversation) => {
     setSelectedConversation(conv);
     setShowMobileConversation(true);
+
     // Mark as read
     if (conv.unread) {
-      setConversations(
-        conversations.map((c) =>
-          c.id === conv.id ? { ...c, unread: false } : c
-        )
-      );
+      try {
+        await fetch("/api/messages", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: conv.id, action: "markRead" }),
+        });
+
+        setConversations(
+          conversations.map((c) =>
+            c.id === conv.id ? { ...c, unread: false } : c
+          )
+        );
+      } catch (error) {
+        console.error("Mark read error:", error);
+      }
     }
   };
 
-  const sendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation || sending) return;
 
-    const newMsg: Message = {
-      id: `m${Date.now()}`,
-      content: newMessage,
-      timestamp: "Just now",
-      isOwn: true,
-    };
+    setSending(true);
+    try {
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: selectedConversation.id,
+          content: newMessage,
+        }),
+      });
 
-    const updatedConversation = {
-      ...selectedConversation,
-      messages: [...selectedConversation.messages, newMsg],
-      lastMessage: newMessage,
-      timestamp: "Just now",
-    };
+      const result = await response.json();
 
-    setConversations(
-      conversations.map((c) =>
-        c.id === selectedConversation.id ? updatedConversation : c
-      )
-    );
-    setSelectedConversation(updatedConversation);
-    setNewMessage("");
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send message");
+      }
+
+      const newMsg: Message = result.data || {
+        id: `m${Date.now()}`,
+        content: newMessage,
+        timestamp: new Date().toISOString(),
+        isOwn: true,
+      };
+
+      const updatedConversation = {
+        ...selectedConversation,
+        messages: [...selectedConversation.messages, newMsg],
+        lastMessage: newMessage,
+        lastMessageAt: new Date().toISOString(),
+      };
+
+      setConversations(
+        conversations.map((c) =>
+          c.id === selectedConversation.id ? updatedConversation : c
+        )
+      );
+      setSelectedConversation(updatedConversation);
+      setNewMessage("");
+    } catch (error) {
+      console.error("Send message error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -277,7 +257,7 @@ export default function MessagesPage() {
           <div className="flex-1 overflow-y-auto">
             {filteredConversations.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                No conversations found
+                {searchQuery ? "No conversations found" : "No messages yet"}
               </div>
             ) : (
               filteredConversations.map((conv) => (
@@ -313,7 +293,7 @@ export default function MessagesPage() {
                         {conv.contact.name}
                       </p>
                       <span className="text-xs text-gray-500 flex-shrink-0">
-                        {conv.timestamp}
+                        {formatTimestamp(conv.lastMessageAt)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 truncate">
@@ -428,11 +408,12 @@ export default function MessagesPage() {
                           msg.isOwn ? "text-blue-200" : "text-gray-500"
                         )}
                       >
-                        {msg.timestamp}
+                        {formatTimestamp(msg.timestamp)}
                       </p>
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Message input */}
@@ -452,13 +433,18 @@ export default function MessagesPage() {
                         sendMessage();
                       }
                     }}
+                    disabled={sending}
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={!newMessage.trim()}
+                    disabled={!newMessage.trim() || sending}
                     size="icon"
                   >
-                    <Send className="w-4 h-4" />
+                    {sending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
