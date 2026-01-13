@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+
+export const dynamic = "force-dynamic";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
 import { jobs as mockJobs } from "@/data/jobs";
