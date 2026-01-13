@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -16,91 +16,34 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Mock companies data
-const companies = [
-  {
-    id: "1",
-    name: "TechCorp Inc.",
-    logo: "https://images.unsplash.com/photo-1549924231-f129b911e442?w=100&h=100&fit=crop",
-    industry: "Technology",
-    location: "San Francisco, CA",
-    website: "https://techcorp.com",
-    employees: "500-1000",
-    status: "verified",
-    activeJobs: 8,
-    totalApplications: 156,
-    joinedAt: "2024-06-15",
-  },
-  {
-    id: "2",
-    name: "StartupXYZ",
-    logo: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=100&h=100&fit=crop",
-    industry: "Technology",
-    location: "New York, NY",
-    website: "https://startupxyz.io",
-    employees: "50-200",
-    status: "verified",
-    activeJobs: 12,
-    totalApplications: 89,
-    joinedAt: "2024-08-20",
-  },
-  {
-    id: "3",
-    name: "DesignCo",
-    logo: "https://images.unsplash.com/photo-1572044162444-ad60f128bdea?w=100&h=100&fit=crop",
-    industry: "Design",
-    location: "Austin, TX",
-    website: "https://designco.com",
-    employees: "10-50",
-    status: "pending",
-    activeJobs: 3,
-    totalApplications: 24,
-    joinedAt: "2025-01-10",
-  },
-  {
-    id: "4",
-    name: "CloudServices LLC",
-    logo: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=100&h=100&fit=crop",
-    industry: "Technology",
-    location: "Seattle, WA",
-    website: "https://cloudservices.io",
-    employees: "200-500",
-    status: "verified",
-    activeJobs: 6,
-    totalApplications: 112,
-    joinedAt: "2024-03-01",
-  },
-  {
-    id: "5",
-    name: "HealthPlus",
-    logo: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=100&h=100&fit=crop",
-    industry: "Healthcare",
-    location: "Boston, MA",
-    website: "https://healthplus.com",
-    employees: "1000+",
-    status: "verified",
-    activeJobs: 15,
-    totalApplications: 234,
-    joinedAt: "2023-11-15",
-  },
-  {
-    id: "6",
-    name: "FinanceFirst",
-    logo: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=100&h=100&fit=crop",
-    industry: "Finance",
-    location: "Chicago, IL",
-    website: "https://financefirst.com",
-    employees: "500-1000",
-    status: "suspended",
-    activeJobs: 0,
-    totalApplications: 45,
-    joinedAt: "2024-05-10",
-  },
-];
+interface Company {
+  id: string;
+  name: string;
+  logo: string;
+  industry: string;
+  location: string;
+  website: string;
+  employees: string;
+  status: string;
+  activeJobs: number;
+  totalApplications: number;
+  joinedAt: string;
+}
+
+interface Stats {
+  total: number;
+  verified: number;
+  pending: number;
+  suspended: number;
+  activeJobs: number;
+}
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; icon: React.ElementType }> = {
   verified: { label: "Verified", bg: "bg-emerald-100", text: "text-emerald-700", icon: CheckCircle },
@@ -109,20 +52,108 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; ic
 };
 
 export default function AdminCompaniesPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    verified: 0,
+    pending: 0,
+    suspended: 0,
+    activeJobs: 0,
+  });
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const filteredCompanies = companies.filter((company) => {
-    const matchesSearch =
-      company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      company.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || company.status === statusFilter;
-    const matchesIndustry = industryFilter === "all" || company.industry === industryFilter;
-    return matchesSearch && matchesStatus && matchesIndustry;
-  });
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
-  const industries = [...new Set(companies.map((c) => c.industry))];
+  const fetchCompanies = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (industryFilter !== "all") params.append("industry", industryFilter);
+
+      const response = await fetch(`/api/admin/companies?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setCompanies(result.data.companies);
+        setStats(result.data.stats);
+        setIndustries(result.data.industries || []);
+        if (showToast) {
+          toast.success("Companies refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch companies");
+      }
+    } catch (error) {
+      console.error("Fetch companies error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh companies");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleSearch = () => {
+    setLoading(true);
+    fetchCompanies(true);
+  };
+
+  const handleStatusChange = async (companyId: string, newStatus: string) => {
+    setActionLoading(companyId);
+
+    try {
+      const response = await fetch("/api/admin/companies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyIds: [companyId], status: newStatus }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`Company ${newStatus === "verified" ? "verified" : newStatus === "suspended" ? "suspended" : "updated"} successfully`);
+        // Update local state
+        setCompanies(companies.map(c =>
+          c.id === companyId ? { ...c, status: newStatus } : c
+        ));
+        // Update stats
+        setStats(prev => {
+          const oldStatus = companies.find(c => c.id === companyId)?.status || "";
+          return {
+            ...prev,
+            [oldStatus]: Math.max(0, (prev[oldStatus as keyof Stats] as number || 0) - 1),
+            [newStatus]: ((prev[newStatus as keyof Stats] as number) || 0) + 1,
+          };
+        });
+      } else {
+        toast.error(result.error || "Action failed");
+      }
+    } catch (error) {
+      console.error("Status change error:", error);
+      toast.error("Failed to update company status");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -132,6 +163,16 @@ export default function AdminCompaniesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
           <p className="text-gray-600 mt-1">Manage employer accounts and company profiles</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchCompanies(true)}
+          disabled={refreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats */}
@@ -142,7 +183,7 @@ export default function AdminCompaniesPage() {
               <Building2 className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{companies.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               <p className="text-sm text-gray-600">Total Companies</p>
             </div>
           </div>
@@ -153,9 +194,7 @@ export default function AdminCompaniesPage() {
               <CheckCircle className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-emerald-600">
-                {companies.filter((c) => c.status === "verified").length}
-              </p>
+              <p className="text-2xl font-bold text-emerald-600">{stats.verified}</p>
               <p className="text-sm text-gray-600">Verified</p>
             </div>
           </div>
@@ -166,9 +205,7 @@ export default function AdminCompaniesPage() {
               <Clock className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-amber-600">
-                {companies.filter((c) => c.status === "pending").length}
-              </p>
+              <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
               <p className="text-sm text-gray-600">Pending Review</p>
             </div>
           </div>
@@ -179,9 +216,7 @@ export default function AdminCompaniesPage() {
               <Briefcase className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-purple-600">
-                {companies.reduce((sum, c) => sum + c.activeJobs, 0)}
-              </p>
+              <p className="text-2xl font-bold text-purple-600">{stats.activeJobs}</p>
               <p className="text-sm text-gray-600">Active Jobs</p>
             </div>
           </div>
@@ -196,12 +231,16 @@ export default function AdminCompaniesPage() {
             placeholder="Search by company name or location..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             className="pl-10"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setTimeout(() => handleSearch(), 0);
+          }}
           className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Status</option>
@@ -211,7 +250,10 @@ export default function AdminCompaniesPage() {
         </select>
         <select
           value={industryFilter}
-          onChange={(e) => setIndustryFilter(e.target.value)}
+          onChange={(e) => {
+            setIndustryFilter(e.target.value);
+            setTimeout(() => handleSearch(), 0);
+          }}
           className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Industries</option>
@@ -225,15 +267,16 @@ export default function AdminCompaniesPage() {
 
       {/* Companies Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredCompanies.length === 0 ? (
+        {companies.length === 0 ? (
           <div className="col-span-full p-12 text-center bg-white rounded-xl border">
             <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-900 font-medium">No companies found</p>
             <p className="text-gray-600 text-sm">Try adjusting your search or filters</p>
           </div>
         ) : (
-          filteredCompanies.map((company) => {
-            const StatusIcon = statusConfig[company.status].icon;
+          companies.map((company) => {
+            const statusInfo = statusConfig[company.status] || statusConfig.pending;
+            const StatusIcon = statusInfo.icon;
             return (
               <div
                 key={company.id}
@@ -269,16 +312,18 @@ export default function AdminCompaniesPage() {
                       <Users className="w-4 h-4" />
                       {company.employees} employees
                     </div>
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      <Globe className="w-4 h-4" />
-                      {company.website.replace("https://", "")}
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {company.website && (
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        <Globe className="w-4 h-4" />
+                        {company.website.replace("https://", "")}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
 
                   <div className="mt-4 pt-4 border-t flex items-center justify-between">
@@ -291,12 +336,10 @@ export default function AdminCompaniesPage() {
                       </span>
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
-                        statusConfig[company.status].bg
-                      } ${statusConfig[company.status].text}`}
+                      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${statusInfo.bg} ${statusInfo.text}`}
                     >
                       <StatusIcon className="w-3 h-3" />
-                      {statusConfig[company.status].label}
+                      {statusInfo.label}
                     </span>
                   </div>
                 </div>
@@ -305,11 +348,30 @@ export default function AdminCompaniesPage() {
                   <div className="px-6 py-3 bg-amber-50 border-t border-amber-100 flex items-center justify-between">
                     <span className="text-sm text-amber-700">Awaiting verification</span>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="h-7 text-xs">
-                        Reject
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => handleStatusChange(company.id, "suspended")}
+                        disabled={actionLoading === company.id}
+                      >
+                        {actionLoading === company.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          "Reject"
+                        )}
                       </Button>
-                      <Button size="sm" className="h-7 text-xs">
-                        Verify
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleStatusChange(company.id, "verified")}
+                        disabled={actionLoading === company.id}
+                      >
+                        {actionLoading === company.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          "Verify"
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -324,8 +386,8 @@ export default function AdminCompaniesPage() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
           Showing <span className="font-medium">1</span> to{" "}
-          <span className="font-medium">{filteredCompanies.length}</span> of{" "}
-          <span className="font-medium">{companies.length}</span> companies
+          <span className="font-medium">{companies.length}</span> of{" "}
+          <span className="font-medium">{stats.total}</span> companies
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled>

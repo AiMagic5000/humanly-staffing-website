@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -18,10 +18,13 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -49,205 +52,124 @@ interface SupportTicket {
   messages: Message[];
 }
 
-// Mock support tickets data
-const mockTickets: SupportTicket[] = [
-  {
-    id: "TKT-001",
-    contact: {
-      name: "John Smith",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-      email: "john.smith@email.com",
-      type: "candidate",
-    },
-    subject: "Cannot access my application status",
-    lastMessage: "I've been trying to check my application but the page keeps loading.",
-    timestamp: "10:30 AM",
-    unread: true,
-    starred: true,
-    priority: "high",
-    status: "open",
-    messages: [
-      {
-        id: "m1",
-        content: "Hi, I applied for a Software Engineer position last week but I cannot access my application status. The dashboard keeps showing a loading spinner.",
-        timestamp: "Today 10:15 AM",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "I've been trying to check my application but the page keeps loading.",
-        timestamp: "Today 10:30 AM",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "TKT-002",
-    contact: {
-      name: "Sarah Miller",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-      email: "sarah@techcorp.com",
-      type: "employer",
-      company: "TechCorp Inc.",
-    },
-    subject: "Billing inquiry - Invoice discrepancy",
-    lastMessage: "Thank you for looking into this matter.",
-    timestamp: "Yesterday",
-    unread: false,
-    starred: false,
-    priority: "medium",
-    status: "pending",
-    messages: [
-      {
-        id: "m1",
-        content: "Hello, I noticed a discrepancy in our latest invoice. We were charged for 10 job postings but only posted 8.",
-        timestamp: "Yesterday 2:30 PM",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Hi Sarah, thank you for reaching out. I'm looking into this right now and will get back to you shortly.",
-        timestamp: "Yesterday 3:00 PM",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Thank you for looking into this matter.",
-        timestamp: "Yesterday 3:15 PM",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "TKT-003",
-    contact: {
-      name: "Michael Chen",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-      email: "m.chen@startup.io",
-      type: "employer",
-      company: "StartupXYZ",
-    },
-    subject: "Feature request - Bulk candidate export",
-    lastMessage: "This would really help streamline our hiring process.",
-    timestamp: "Jan 10",
-    unread: false,
-    starred: true,
-    priority: "low",
-    status: "open",
-    messages: [
-      {
-        id: "m1",
-        content: "Would it be possible to add a feature to export all candidate applications to CSV? This would really help streamline our hiring process.",
-        timestamp: "Jan 10",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "TKT-004",
-    contact: {
-      name: "Emily Rodriguez",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-      email: "emily.r@email.com",
-      type: "candidate",
-    },
-    subject: "Account verification issue",
-    lastMessage: "Your account has been verified. Let us know if you have any other questions!",
-    timestamp: "Jan 8",
-    unread: false,
-    starred: false,
-    priority: "medium",
-    status: "resolved",
-    messages: [
-      {
-        id: "m1",
-        content: "I'm having trouble verifying my email address. The verification link seems to be expired.",
-        timestamp: "Jan 8 10:00 AM",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "I've resent you a new verification link. Please check your inbox.",
-        timestamp: "Jan 8 10:30 AM",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Your account has been verified. Let us know if you have any other questions!",
-        timestamp: "Jan 8 11:00 AM",
-        isOwn: true,
-      },
-    ],
-  },
-  {
-    id: "TKT-005",
-    contact: {
-      name: "David Kim",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-      email: "david@cloudservices.com",
-      type: "employer",
-      company: "CloudServices Co.",
-    },
-    subject: "URGENT: Job posting removed without notice",
-    lastMessage: "Our job posting for Senior Engineer was removed. We need this restored ASAP.",
-    timestamp: "2 hours ago",
-    unread: true,
-    starred: false,
-    priority: "urgent",
-    status: "open",
-    messages: [
-      {
-        id: "m1",
-        content: "Our job posting for Senior Engineer was removed. We need this restored ASAP. We have interviews scheduled for this week!",
-        timestamp: "2 hours ago",
-        isOwn: false,
-      },
-    ],
-  },
-];
+interface Stats {
+  open: number;
+  pending: number;
+  urgent: number;
+  resolved: number;
+}
 
 type FilterType = "all" | "open" | "pending" | "resolved" | "urgent";
 
 export default function AdminMessagesPage() {
-  const [tickets, setTickets] = useState(mockTickets);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [stats, setStats] = useState<Stats>({ open: 0, pending: 0, urgent: 0, resolved: 0 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [showMobileConversation, setShowMobileConversation] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch =
-      ticket.contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.id.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    fetchTickets();
+  }, []);
 
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "open" && ticket.status === "open") ||
-      (filter === "pending" && ticket.status === "pending") ||
-      (filter === "resolved" && ticket.status === "resolved") ||
-      (filter === "urgent" && ticket.priority === "urgent");
+  const fetchTickets = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
 
-    return matchesSearch && matchesFilter;
-  });
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (filter !== "all") params.append("status", filter);
 
-  const stats = {
-    open: tickets.filter((t) => t.status === "open").length,
-    pending: tickets.filter((t) => t.status === "pending").length,
-    urgent: tickets.filter((t) => t.priority === "urgent").length,
-    resolved: tickets.filter((t) => t.status === "resolved").length,
+      const response = await fetch(`/api/admin/messages?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setTickets(result.data.tickets);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Tickets refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch tickets");
+      }
+    } catch (error) {
+      console.error("Fetch tickets error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh tickets");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const toggleStar = (id: string) => {
-    setTickets(
-      tickets.map((t) => (t.id === id ? { ...t, starred: !t.starred } : t))
-    );
-    if (selectedTicket?.id === id) {
-      setSelectedTicket({
-        ...selectedTicket,
-        starred: !selectedTicket.starred,
+  const handleSearch = () => {
+    fetchTickets(true);
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInHours * 60);
+      return `${diffInMinutes} min ago`;
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else if (diffInHours < 48) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+  };
+
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return `Today ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    } else if (diffInHours < 48) {
+      return `Yesterday ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    } else {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
       });
+    }
+  };
+
+  const toggleStar = async (id: string) => {
+    const ticket = tickets.find(t => t.id === id);
+    if (!ticket) return;
+
+    const newStarred = !ticket.starred;
+
+    // Optimistic update
+    setTickets(tickets.map((t) => (t.id === id ? { ...t, starred: newStarred } : t)));
+    if (selectedTicket?.id === id) {
+      setSelectedTicket({ ...selectedTicket, starred: newStarred });
+    }
+
+    try {
+      await fetch("/api/admin/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: id, starred: newStarred }),
+      });
+    } catch (error) {
+      console.error("Toggle star error:", error);
+      // Revert on error
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, starred: !newStarred } : t)));
     }
   };
 
@@ -259,20 +181,35 @@ export default function AdminMessagesPage() {
     }
   };
 
-  const updateStatus = (status: SupportTicket["status"]) => {
+  const updateStatus = async (status: SupportTicket["status"]) => {
     if (!selectedTicket) return;
+
     const updated = { ...selectedTicket, status };
     setTickets(tickets.map((t) => (t.id === selectedTicket.id ? updated : t)));
     setSelectedTicket(updated);
+
+    try {
+      await fetch("/api/admin/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: selectedTicket.id, status }),
+      });
+      toast.success(`Ticket marked as ${status}`);
+    } catch (error) {
+      console.error("Update status error:", error);
+      toast.error("Failed to update status");
+    }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim() || !selectedTicket) return;
+
+    setSendingMessage(true);
 
     const newMsg: Message = {
       id: `m${Date.now()}`,
       content: newMessage,
-      timestamp: "Just now",
+      timestamp: new Date().toISOString(),
       isOwn: true,
     };
 
@@ -280,12 +217,26 @@ export default function AdminMessagesPage() {
       ...selectedTicket,
       messages: [...selectedTicket.messages, newMsg],
       lastMessage: newMessage,
-      timestamp: "Just now",
+      timestamp: new Date().toISOString(),
     };
 
+    // Optimistic update
     setTickets(tickets.map((t) => (t.id === selectedTicket.id ? updatedTicket : t)));
     setSelectedTicket(updatedTicket);
     setNewMessage("");
+
+    try {
+      await fetch("/api/admin/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: selectedTicket.id, message: newMessage }),
+      });
+    } catch (error) {
+      console.error("Send message error:", error);
+      toast.error("Failed to send message");
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const getPriorityBadge = (priority: SupportTicket["priority"]) => {
@@ -314,9 +265,34 @@ export default function AdminMessagesPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Stats */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Support Tickets</h1>
+          <p className="text-gray-600 mt-1">Manage customer support requests</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchTickets(true)}
+          disabled={refreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center gap-3">
@@ -365,7 +341,7 @@ export default function AdminMessagesPage() {
       </div>
 
       {/* Main content */}
-      <div className="h-[calc(100vh-20rem)] bg-white rounded-xl border overflow-hidden flex">
+      <div className="h-[calc(100vh-24rem)] bg-white rounded-xl border overflow-hidden flex">
         {/* Tickets list */}
         <div
           className={cn(
@@ -380,6 +356,7 @@ export default function AdminMessagesPage() {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="Search tickets..."
                 className="pl-9"
               />
@@ -388,7 +365,10 @@ export default function AdminMessagesPage() {
               <Filter className="w-4 h-4 text-gray-400" />
               <select
                 value={filter}
-                onChange={(e) => setFilter(e.target.value as FilterType)}
+                onChange={(e) => {
+                  setFilter(e.target.value as FilterType);
+                  setTimeout(() => handleSearch(), 0);
+                }}
                 className="flex-1 px-2 py-1.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Tickets</option>
@@ -402,10 +382,10 @@ export default function AdminMessagesPage() {
 
           {/* Ticket list */}
           <div className="flex-1 overflow-y-auto">
-            {filteredTickets.length === 0 ? (
+            {tickets.length === 0 ? (
               <div className="p-8 text-center text-gray-500">No tickets found</div>
             ) : (
-              filteredTickets.map((ticket) => (
+              tickets.map((ticket) => (
                 <button
                   key={ticket.id}
                   onClick={() => selectTicket(ticket)}
@@ -440,7 +420,7 @@ export default function AdminMessagesPage() {
                         {ticket.contact.name}
                       </p>
                       <span className="text-xs text-gray-500 flex-shrink-0">
-                        {ticket.timestamp}
+                        {formatTimestamp(ticket.timestamp)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -614,7 +594,7 @@ export default function AdminMessagesPage() {
                           msg.isOwn ? "text-blue-200" : "text-gray-500"
                         )}
                       >
-                        {msg.timestamp}
+                        {formatMessageTime(msg.timestamp)}
                       </p>
                     </div>
                   </div>
@@ -639,8 +619,16 @@ export default function AdminMessagesPage() {
                       }
                     }}
                   />
-                  <Button onClick={sendMessage} disabled={!newMessage.trim()} size="icon">
-                    <Send className="w-4 h-4" />
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim() || sendingMessage}
+                    size="icon"
+                  >
+                    {sendingMessage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>

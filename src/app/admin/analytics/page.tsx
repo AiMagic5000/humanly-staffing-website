@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -12,79 +13,164 @@ import {
   Target,
   BarChart3,
   PieChart,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-// Mock analytics data
-const overviewStats = [
-  {
-    label: "Total Revenue",
-    value: "$284,500",
-    change: "+12.5%",
-    changeType: "positive" as const,
-    icon: DollarSign,
-    description: "vs. last month",
-  },
-  {
-    label: "Active Users",
-    value: "12,847",
-    change: "+8.2%",
-    changeType: "positive" as const,
-    icon: Users,
-    description: "vs. last month",
-  },
-  {
-    label: "Applications",
-    value: "3,456",
-    change: "+23.1%",
-    changeType: "positive" as const,
-    icon: FileText,
-    description: "vs. last month",
-  },
-  {
-    label: "Placements",
-    value: "287",
-    change: "+5.4%",
-    changeType: "positive" as const,
-    icon: Target,
-    description: "vs. last month",
-  },
-];
+interface AnalyticsData {
+  overview: {
+    totalUsers: number;
+    activeJobs: number;
+    totalApplications: number;
+    totalCompanies: number;
+    totalCandidates: number;
+    totalPlacements: number;
+    totalRevenue: number;
+  };
+  changes: {
+    users: number;
+    jobs: number;
+    applications: number;
+    companies: number;
+    placements: number;
+    revenue: number;
+  };
+  monthlyApplications: Array<{
+    month: string;
+    applications: number;
+    placements: number;
+  }>;
+  topJobs: Array<{
+    title: string;
+    applications: number;
+    views: number;
+    conversion: number;
+  }>;
+  topIndustries: Array<{
+    name: string;
+    jobs: number;
+    applications: number;
+    percentage: number;
+  }>;
+  recentActivity: Array<{
+    type: string;
+    company?: string;
+    candidate?: string;
+    job?: string;
+    time: string;
+  }>;
+}
 
-const topJobs = [
-  { title: "Senior Software Engineer", applications: 156, views: 2340, conversion: "6.7%" },
-  { title: "Product Manager", applications: 134, views: 1890, conversion: "7.1%" },
-  { title: "UX Designer", applications: 98, views: 1456, conversion: "6.7%" },
-  { title: "Data Analyst", applications: 87, views: 1234, conversion: "7.0%" },
-  { title: "DevOps Engineer", applications: 76, views: 987, conversion: "7.7%" },
-];
-
-const topIndustries = [
-  { name: "Technology", jobs: 156, applications: 2340, percentage: 35 },
-  { name: "Healthcare", jobs: 98, applications: 1567, percentage: 24 },
-  { name: "Finance", jobs: 87, applications: 1234, percentage: 19 },
-  { name: "Manufacturing", jobs: 65, applications: 876, percentage: 13 },
-  { name: "Retail", jobs: 45, applications: 543, percentage: 9 },
-];
-
-const monthlyData = [
-  { month: "Aug", applications: 2100, placements: 189 },
-  { month: "Sep", applications: 2400, placements: 215 },
-  { month: "Oct", applications: 2800, placements: 242 },
-  { month: "Nov", applications: 3100, placements: 268 },
-  { month: "Dec", applications: 2900, placements: 251 },
-  { month: "Jan", applications: 3456, placements: 287 },
-];
-
-const recentActivity = [
-  { action: "New employer registered", company: "TechStart Inc.", time: "2 min ago" },
-  { action: "Application submitted", candidate: "Sarah Johnson", job: "Senior Engineer", time: "5 min ago" },
-  { action: "Job posting approved", job: "Product Manager at StartupXYZ", time: "12 min ago" },
-  { action: "Placement confirmed", candidate: "Michael Chen", company: "CloudServices", time: "28 min ago" },
-  { action: "New candidate registered", candidate: "Emily Rodriguez", time: "45 min ago" },
-];
+const activityLabels: Record<string, string> = {
+  employer_registered: "New employer registered",
+  application_submitted: "Application submitted",
+  job_approved: "Job posting approved",
+  placement_confirmed: "Placement confirmed",
+  candidate_registered: "New candidate registered",
+};
 
 export default function AdminAnalyticsPage() {
-  const maxApplications = Math.max(...monthlyData.map(d => d.applications));
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [period, setPeriod] = useState("30d");
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [period]);
+
+  const fetchAnalytics = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch(`/api/admin/analytics?period=${period}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAnalytics(result.data);
+        if (showToast) {
+          toast.success("Analytics refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch analytics");
+      }
+    } catch (error) {
+      console.error("Fetch analytics error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh analytics");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-gray-600">Failed to load analytics</p>
+      </div>
+    );
+  }
+
+  const overviewStats = [
+    {
+      label: "Total Revenue",
+      value: `$${analytics.overview.totalRevenue.toLocaleString()}`,
+      change: `+${analytics.changes.revenue}%`,
+      changeType: "positive" as const,
+      icon: DollarSign,
+      description: "vs. last month",
+    },
+    {
+      label: "Active Users",
+      value: analytics.overview.totalUsers.toLocaleString(),
+      change: `+${analytics.changes.users}%`,
+      changeType: "positive" as const,
+      icon: Users,
+      description: "vs. last month",
+    },
+    {
+      label: "Applications",
+      value: analytics.overview.totalApplications.toLocaleString(),
+      change: `+${analytics.changes.applications}%`,
+      changeType: "positive" as const,
+      icon: FileText,
+      description: "vs. last month",
+    },
+    {
+      label: "Placements",
+      value: analytics.overview.totalPlacements.toLocaleString(),
+      change: `+${analytics.changes.placements}%`,
+      changeType: "positive" as const,
+      icon: Target,
+      description: "vs. last month",
+    },
+  ];
+
+  const maxApplications = Math.max(...analytics.monthlyApplications.map(d => d.applications));
 
   return (
     <div className="space-y-8">
@@ -95,9 +181,23 @@ export default function AdminAnalyticsPage() {
           <p className="text-gray-600 mt-1">Platform performance and insights</p>
         </div>
         <div className="flex items-center gap-2">
-          <select className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAnalytics(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
             <option value="7d">Last 7 days</option>
-            <option value="30d" selected>Last 30 days</option>
+            <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
             <option value="12m">Last 12 months</option>
           </select>
@@ -145,7 +245,7 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
           <div className="space-y-4">
-            {monthlyData.map((data) => (
+            {analytics.monthlyApplications.map((data) => (
               <div key={data.month} className="flex items-center gap-4">
                 <span className="w-10 text-sm text-gray-600">{data.month}</span>
                 <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden">
@@ -174,7 +274,7 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
           <div className="space-y-4">
-            {topIndustries.map((industry, index) => {
+            {analytics.topIndustries.map((industry, index) => {
               const colors = [
                 "bg-blue-500",
                 "bg-emerald-500",
@@ -234,7 +334,7 @@ export default function AdminAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {topJobs.map((job, index) => (
+                {analytics.topJobs.map((job, index) => (
                   <tr key={index} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{job.title}</p>
@@ -247,7 +347,7 @@ export default function AdminAnalyticsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                        {job.conversion}
+                        {job.conversion}%
                       </span>
                     </td>
                   </tr>
@@ -269,13 +369,15 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
           <div className="divide-y">
-            {recentActivity.map((activity, index) => (
+            {analytics.recentActivity.map((activity, index) => (
               <div key={index} className="px-6 py-4">
-                <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {activityLabels[activity.type] || activity.type}
+                </p>
                 <p className="text-xs text-gray-600 mt-1">
                   {activity.company || activity.candidate || activity.job}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                <p className="text-xs text-gray-400 mt-1">{formatTimeAgo(activity.time)}</p>
               </div>
             ))}
           </div>
@@ -286,17 +388,17 @@ export default function AdminAnalyticsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
           <Users className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">8,542</p>
+          <p className="text-3xl font-bold">{analytics.overview.totalCandidates.toLocaleString()}</p>
           <p className="text-sm text-blue-100 mt-1">Total Candidates</p>
         </div>
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
           <Building2 className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">456</p>
+          <p className="text-3xl font-bold">{analytics.overview.totalCompanies}</p>
           <p className="text-sm text-purple-100 mt-1">Total Companies</p>
         </div>
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
           <Briefcase className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">1,234</p>
+          <p className="text-3xl font-bold">{analytics.overview.activeJobs.toLocaleString()}</p>
           <p className="text-sm text-emerald-100 mt-1">Active Jobs</p>
         </div>
         <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white">

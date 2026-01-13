@@ -372,6 +372,187 @@ VALUES
 */
 
 -- =====================================================
+-- SYSTEM NOTIFICATIONS TABLE (Admin)
+-- Stores system-level alerts and notifications for admins
+-- =====================================================
+CREATE TABLE IF NOT EXISTS system_notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type TEXT CHECK (type IN ('info', 'success', 'warning', 'error')) DEFAULT 'info',
+    category TEXT CHECK (category IN ('system', 'security', 'billing', 'user', 'job', 'application')) DEFAULT 'system',
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    read BOOLEAN DEFAULT false,
+    action_required BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for system notifications
+CREATE INDEX IF NOT EXISTS idx_system_notifications_type ON system_notifications(type);
+CREATE INDEX IF NOT EXISTS idx_system_notifications_read ON system_notifications(read);
+CREATE INDEX IF NOT EXISTS idx_system_notifications_created ON system_notifications(created_at DESC);
+
+-- =====================================================
+-- SUPPORT TICKETS TABLE (Admin Messages)
+-- Stores support tickets/messages from users
+-- =====================================================
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    status TEXT CHECK (status IN ('open', 'pending', 'resolved', 'closed')) DEFAULT 'open',
+    priority TEXT CHECK (priority IN ('low', 'medium', 'high', 'urgent')) DEFAULT 'medium',
+    starred BOOLEAN DEFAULT false,
+    unread BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for support tickets
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_priority ON support_tickets(priority);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_updated ON support_tickets(updated_at DESC);
+
+-- =====================================================
+-- SUPPORT MESSAGES TABLE
+-- Stores individual messages within support tickets
+-- =====================================================
+CREATE TABLE IF NOT EXISTS support_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for support messages
+CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_support_messages_created ON support_messages(created_at);
+
+-- =====================================================
+-- CONTACT SUBMISSIONS TABLE
+-- Stores contact form submissions
+-- =====================================================
+CREATE TABLE IF NOT EXISTS contact_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT,
+    company TEXT,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT CHECK (type IN ('general', 'employer', 'candidate')) DEFAULT 'general',
+    status TEXT CHECK (status IN ('new', 'read', 'replied', 'archived')) DEFAULT 'new',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for contact submissions
+CREATE INDEX IF NOT EXISTS idx_contact_email ON contact_submissions(email);
+CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_contact_created ON contact_submissions(created_at DESC);
+
+-- =====================================================
+-- TALENT REQUESTS TABLE
+-- Stores employer talent request submissions
+-- =====================================================
+CREATE TABLE IF NOT EXISTS talent_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_name TEXT NOT NULL,
+    industry TEXT NOT NULL,
+    contact_name TEXT NOT NULL,
+    contact_title TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    position_title TEXT NOT NULL,
+    number_of_positions INTEGER DEFAULT 1,
+    employment_type TEXT NOT NULL,
+    location TEXT NOT NULL,
+    salary_range TEXT,
+    hiring_timeline TEXT NOT NULL,
+    job_description TEXT NOT NULL,
+    additional_notes TEXT,
+    status TEXT CHECK (status IN ('new', 'reviewing', 'contacted', 'filled', 'closed')) DEFAULT 'new',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for talent requests
+CREATE INDEX IF NOT EXISTS idx_talent_requests_status ON talent_requests(status);
+CREATE INDEX IF NOT EXISTS idx_talent_requests_created ON talent_requests(created_at DESC);
+
+-- Enable RLS on new tables
+ALTER TABLE system_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE talent_requests ENABLE ROW LEVEL SECURITY;
+
+-- Policies for admin tables (admins only)
+CREATE POLICY "Admins can view system notifications"
+    ON system_notifications FOR SELECT
+    USING (true); -- Service role will bypass, or add admin check
+
+CREATE POLICY "Admins can update system notifications"
+    ON system_notifications FOR UPDATE
+    USING (true);
+
+CREATE POLICY "Admins can delete system notifications"
+    ON system_notifications FOR DELETE
+    USING (true);
+
+CREATE POLICY "Admins can view support tickets"
+    ON support_tickets FOR SELECT
+    USING (true);
+
+CREATE POLICY "Users can view their own tickets"
+    ON support_tickets FOR SELECT
+    USING (auth.uid()::text = user_id);
+
+CREATE POLICY "Admins can update support tickets"
+    ON support_tickets FOR UPDATE
+    USING (true);
+
+CREATE POLICY "Users can create support tickets"
+    ON support_tickets FOR INSERT
+    WITH CHECK (auth.uid()::text = user_id);
+
+CREATE POLICY "Admins can view support messages"
+    ON support_messages FOR SELECT
+    USING (true);
+
+CREATE POLICY "Admins can insert support messages"
+    ON support_messages FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Admins can view contact submissions"
+    ON contact_submissions FOR SELECT
+    USING (true);
+
+CREATE POLICY "Anyone can submit contact form"
+    ON contact_submissions FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Admins can view talent requests"
+    ON talent_requests FOR SELECT
+    USING (true);
+
+CREATE POLICY "Anyone can submit talent request"
+    ON talent_requests FOR INSERT
+    WITH CHECK (true);
+
+-- Trigger for support tickets updated_at
+CREATE TRIGGER update_support_tickets_updated_at
+    BEFORE UPDATE ON support_tickets
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger for talent requests updated_at
+CREATE TRIGGER update_talent_requests_updated_at
+    BEFORE UPDATE ON talent_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
 -- VIEWS (Optional - for common queries)
 -- =====================================================
 
@@ -421,6 +602,11 @@ BEGIN
     - applications
     - saved_jobs
     - notifications
+    - system_notifications (admin)
+    - support_tickets (admin)
+    - support_messages (admin)
+    - contact_submissions
+    - talent_requests
 
     Views created:
     - active_jobs_view

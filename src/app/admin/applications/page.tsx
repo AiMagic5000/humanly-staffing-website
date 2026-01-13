@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -11,125 +11,40 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Mock applications data
-const applications = [
-  {
-    id: "1",
-    candidate: {
-      name: "Sarah Johnson",
-      email: "sarah.johnson@email.com",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-      location: "San Francisco, CA",
-    },
-    job: {
-      id: "1",
-      title: "Senior Software Engineer",
-      company: "TechCorp Inc.",
-    },
-    appliedAt: "2025-01-13T10:30:00Z",
-    status: "new",
-  },
-  {
-    id: "2",
-    candidate: {
-      name: "Michael Chen",
-      email: "michael.chen@email.com",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-      location: "New York, NY",
-    },
-    job: {
-      id: "2",
-      title: "Product Manager",
-      company: "StartupXYZ",
-    },
-    appliedAt: "2025-01-13T08:15:00Z",
-    status: "reviewing",
-  },
-  {
-    id: "3",
-    candidate: {
-      name: "Emily Rodriguez",
-      email: "emily.rodriguez@email.com",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-      location: "Austin, TX",
-    },
-    job: {
-      id: "3",
-      title: "UX Designer",
-      company: "DesignCo",
-    },
-    appliedAt: "2025-01-12T14:45:00Z",
-    status: "shortlisted",
-  },
-  {
-    id: "4",
-    candidate: {
-      name: "David Kim",
-      email: "david.kim@email.com",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-      location: "Seattle, WA",
-    },
-    job: {
-      id: "1",
-      title: "Senior Software Engineer",
-      company: "TechCorp Inc.",
-    },
-    appliedAt: "2025-01-12T09:20:00Z",
-    status: "interviewed",
-  },
-  {
-    id: "5",
-    candidate: {
-      name: "Jennifer Lee",
-      email: "jennifer.lee@email.com",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-      location: "Los Angeles, CA",
-    },
-    job: {
-      id: "4",
-      title: "Marketing Manager",
-      company: "BrandBoost",
-    },
-    appliedAt: "2025-01-11T16:00:00Z",
-    status: "hired",
-  },
-  {
-    id: "6",
-    candidate: {
-      name: "Robert Wilson",
-      email: "robert.wilson@email.com",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
-      location: "Chicago, IL",
-    },
-    job: {
-      id: "5",
-      title: "Data Analyst",
-      company: "DataDriven",
-    },
-    appliedAt: "2025-01-11T11:30:00Z",
-    status: "rejected",
-  },
-  {
-    id: "7",
-    candidate: {
-      name: "Lisa Anderson",
-      email: "lisa.anderson@email.com",
-      avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=100&h=100&fit=crop",
-      location: "Denver, CO",
-    },
-    job: {
-      id: "2",
-      title: "Product Manager",
-      company: "StartupXYZ",
-    },
-    appliedAt: "2025-01-10T09:45:00Z",
-    status: "new",
-  },
-];
+interface Application {
+  id: string;
+  candidate: {
+    name: string;
+    email: string;
+    avatar: string;
+    location: string;
+  };
+  job: {
+    id: string;
+    title: string;
+    company: string;
+  };
+  appliedAt: string;
+  status: string;
+}
+
+interface Stats {
+  total: number;
+  new: number;
+  reviewing: number;
+  shortlisted: number;
+  interviewed: number;
+  offered: number;
+  hired: number;
+  rejected: number;
+}
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
   new: { label: "New", bg: "bg-blue-100", text: "text-blue-700" },
@@ -142,19 +57,88 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 };
 
 export default function AdminApplicationsPage() {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    total: 0, new: 0, reviewing: 0, shortlisted: 0,
+    interviewed: 0, offered: 0, hired: 0, rejected: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedApplications, setSelectedApplications] = useState<string[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const filteredApplications = applications.filter((app) => {
-    const matchesSearch =
-      app.candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.job.company.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || app.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    fetchApplications();
+  }, []);
+
+  const fetchApplications = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+
+      const response = await fetch(`/api/admin/applications?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setApplications(result.data.applications);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Applications refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch applications");
+      }
+    } catch (error) {
+      console.error("Fetch applications error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh applications");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleSearch = () => {
+    setLoading(true);
+    fetchApplications(true);
+  };
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedApplications.length === 0) return;
+
+    setActionLoading(true);
+
+    try {
+      const response = await fetch("/api/admin/applications", {
+        method: action === "delete" ? "DELETE" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationIds: selectedApplications,
+          status: action !== "delete" ? action : undefined,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success(result.message);
+        setSelectedApplications([]);
+        fetchApplications();
+      } else {
+        toast.error(result.error || "Action failed");
+      }
+    } catch (error) {
+      console.error("Bulk action error:", error);
+      toast.error("Failed to perform action");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -167,10 +151,10 @@ export default function AdminApplicationsPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedApplications.length === filteredApplications.length) {
+    if (selectedApplications.length === applications.length) {
       setSelectedApplications([]);
     } else {
-      setSelectedApplications(filteredApplications.map((a) => a.id));
+      setSelectedApplications(applications.map((a) => a.id));
     }
   };
 
@@ -179,6 +163,14 @@ export default function AdminApplicationsPage() {
       prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
     );
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -190,29 +182,47 @@ export default function AdminApplicationsPage() {
             Manage and review all job applications
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchApplications(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" className="gap-2">
+            <Download className="w-4 h-4" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
         <button
-          onClick={() => setStatusFilter("all")}
+          onClick={() => {
+            setStatusFilter("all");
+            setTimeout(() => handleSearch(), 0);
+          }}
           className={`p-3 rounded-lg border text-center transition-all ${
             statusFilter === "all" ? "border-gray-900 bg-gray-50" : "bg-white hover:border-gray-300"
           }`}
         >
-          <p className="text-lg font-bold text-gray-900">{applications.length}</p>
+          <p className="text-lg font-bold text-gray-900">{stats.total}</p>
           <p className="text-xs text-gray-600">Total</p>
         </button>
         {Object.entries(statusConfig).map(([key, config]) => {
-          const count = applications.filter((a) => a.status === key).length;
+          const count = stats[key as keyof Stats] || 0;
           return (
             <button
               key={key}
-              onClick={() => setStatusFilter(key)}
+              onClick={() => {
+                setStatusFilter(key);
+                setTimeout(() => handleSearch(), 0);
+              }}
               className={`p-3 rounded-lg border text-center transition-all ${
                 statusFilter === key
                   ? `${config.bg} border-current`
@@ -238,12 +248,13 @@ export default function AdminApplicationsPage() {
             placeholder="Search by name, email, job, or company..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             className="pl-10"
           />
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={handleSearch}>
           <Filter className="w-4 h-4" />
-          More Filters
+          Search
         </Button>
       </div>
 
@@ -254,13 +265,36 @@ export default function AdminApplicationsPage() {
             {selectedApplications.length} selected
           </span>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline">
-              Change Status
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleBulkAction("reviewing")}
+              disabled={actionLoading}
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Mark Reviewing
             </Button>
-            <Button size="sm" variant="outline">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleBulkAction("shortlisted")}
+              disabled={actionLoading}
+            >
+              Shortlist
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+            >
               Send Email
             </Button>
-            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 hover:text-red-700"
+              onClick={() => handleBulkAction("delete")}
+              disabled={actionLoading}
+            >
               Delete
             </Button>
           </div>
@@ -276,7 +310,7 @@ export default function AdminApplicationsPage() {
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={selectedApplications.length === filteredApplications.length && filteredApplications.length > 0}
+                    checked={selectedApplications.length === applications.length && applications.length > 0}
                     onChange={toggleSelectAll}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -302,7 +336,7 @@ export default function AdminApplicationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredApplications.length === 0 ? (
+              {applications.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">
                     <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -311,64 +345,65 @@ export default function AdminApplicationsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredApplications.map((application) => (
-                  <tr key={application.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedApplications.includes(application.id)}
-                        onChange={() => toggleSelect(application.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <Image
-                          src={application.candidate.avatar}
-                          alt={application.candidate.name}
-                          width={40}
-                          height={40}
-                          className="rounded-full object-cover"
+                applications.map((application) => {
+                  const status = statusConfig[application.status] || statusConfig.new;
+                  return (
+                    <tr key={application.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedApplications.includes(application.id)}
+                          onChange={() => toggleSelect(application.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <div>
-                          <p className="font-medium text-gray-900">{application.candidate.name}</p>
-                          <p className="text-sm text-gray-600">{application.candidate.email}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={application.candidate.avatar}
+                            alt={application.candidate.name}
+                            width={40}
+                            height={40}
+                            className="rounded-full object-cover"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-900">{application.candidate.name}</p>
+                            <p className="text-sm text-gray-600">{application.candidate.email}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="font-medium text-gray-900">{application.job.title}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-gray-600">{application.job.company}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-sm text-gray-600">{formatDate(application.appliedAt)}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${
-                          statusConfig[application.status].bg
-                        } ${statusConfig[application.status].text}`}
-                      >
-                        {statusConfig[application.status].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Mail className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-gray-900">{application.job.title}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-gray-600">{application.job.company}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-gray-600">{formatDate(application.appliedAt)}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${status.bg} ${status.text}`}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="sm">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <Mail className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -378,8 +413,8 @@ export default function AdminApplicationsPage() {
         <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
           <p className="text-sm text-gray-600">
             Showing <span className="font-medium">1</span> to{" "}
-            <span className="font-medium">{filteredApplications.length}</span> of{" "}
-            <span className="font-medium">{applications.length}</span> results
+            <span className="font-medium">{applications.length}</span> of{" "}
+            <span className="font-medium">{stats.total}</span> results
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled>

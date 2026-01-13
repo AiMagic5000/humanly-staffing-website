@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Bell,
   AlertTriangle,
@@ -14,10 +14,12 @@ import {
   Search,
   RefreshCw,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface SystemNotification {
   id: string;
@@ -26,102 +28,16 @@ interface SystemNotification {
   title: string;
   description: string;
   time: string;
-  date: string;
   read: boolean;
   actionRequired: boolean;
 }
 
-// Mock system notifications for admin
-const mockNotifications: SystemNotification[] = [
-  {
-    id: "1",
-    type: "error",
-    category: "system",
-    title: "Database Connection Issue",
-    description: "Intermittent connection failures detected in the application database. Auto-recovery in progress.",
-    time: "10:30 AM",
-    date: "Today",
-    read: false,
-    actionRequired: true,
-  },
-  {
-    id: "2",
-    type: "warning",
-    category: "security",
-    title: "Unusual Login Activity",
-    description: "Multiple failed login attempts detected from IP 192.168.1.45. Consider reviewing security logs.",
-    time: "9:15 AM",
-    date: "Today",
-    read: false,
-    actionRequired: true,
-  },
-  {
-    id: "3",
-    type: "success",
-    category: "billing",
-    title: "Payment Processing Complete",
-    description: "Monthly subscription payments processed successfully. 45 transactions completed.",
-    time: "8:00 AM",
-    date: "Today",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "4",
-    type: "info",
-    category: "user",
-    title: "New Employer Registration",
-    description: "TechCorp Inc. completed employer registration. Awaiting profile verification.",
-    time: "4:30 PM",
-    date: "Yesterday",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "5",
-    type: "warning",
-    category: "job",
-    title: "Job Posting Flagged",
-    description: "Job posting #1234 has been flagged for review due to policy violation reports.",
-    time: "2:15 PM",
-    date: "Yesterday",
-    read: true,
-    actionRequired: true,
-  },
-  {
-    id: "6",
-    type: "info",
-    category: "application",
-    title: "High Application Volume",
-    description: "Senior Software Engineer position received 50+ applications in the last 24 hours.",
-    time: "11:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "7",
-    type: "success",
-    category: "system",
-    title: "System Update Complete",
-    description: "Platform successfully updated to version 2.4.0. All services running normally.",
-    time: "3:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    actionRequired: false,
-  },
-  {
-    id: "8",
-    type: "error",
-    category: "billing",
-    title: "Payment Failed",
-    description: "Subscription payment for StartupXYZ failed. Customer notified via email.",
-    time: "9:45 PM",
-    date: "Jan 10, 2025",
-    read: true,
-    actionRequired: true,
-  },
-];
+interface Stats {
+  total: number;
+  unread: number;
+  actionRequired: number;
+  errors: number;
+}
 
 const getTypeIcon = (type: SystemNotification["type"]) => {
   switch (type) {
@@ -173,34 +89,80 @@ const getCategoryLabel = (category: SystemNotification["category"]) => {
 type FilterType = "all" | "unread" | "actionRequired" | "error" | "warning" | "success" | "info";
 
 export default function AdminNotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, unread: 0, actionRequired: 0, errors: 0 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const stats = {
-    total: notifications.length,
-    unread: notifications.filter((n) => !n.read).length,
-    actionRequired: notifications.filter((n) => n.actionRequired).length,
-    errors: notifications.filter((n) => n.type === "error").length,
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (filter !== "all") params.append("filter", filter);
+
+      const response = await fetch(`/api/admin/notifications?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setNotifications(result.data.notifications);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Notifications refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch notifications");
+      }
+    } catch (error) {
+      console.error("Fetch notifications error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh notifications");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const filteredNotifications = notifications.filter((n) => {
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "unread" && !n.read) ||
-      (filter === "actionRequired" && n.actionRequired) ||
-      n.type === filter;
+  const handleSearch = () => {
+    fetchNotifications(true);
+  };
 
-    const matchesSearch = searchQuery
-      ? n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        n.description.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-    return matchesFilter && matchesSearch;
-  });
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInHours * 60);
+      return diffInMinutes <= 1 ? "Just now" : `${diffInMinutes} min ago`;
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else {
+      return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    }
+  };
 
-  const groupedNotifications = filteredNotifications.reduce((groups, notification) => {
-    const date = notification.date;
+  const getDateLabel = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) return "Today";
+    if (diffInDays === 1) return "Yesterday";
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  // Group notifications by date
+  const groupedNotifications = notifications.reduce((groups, notification) => {
+    const date = getDateLabel(notification.time);
     if (!groups[date]) {
       groups[date] = [];
     }
@@ -208,23 +170,95 @@ export default function AdminNotificationsPage() {
     return groups;
   }, {} as Record<string, SystemNotification[]>);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    // Optimistic update
     setNotifications(
       notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    setStats(prev => ({ ...prev, unread: Math.max(0, prev.unread - 1) }));
+
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationIds: [id], read: true }),
+      });
+    } catch (error) {
+      console.error("Mark as read error:", error);
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    // Optimistic update
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    setStats(prev => ({ ...prev, unread: 0 }));
+
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true }),
+      });
+      toast.success("All notifications marked as read");
+    } catch (error) {
+      console.error("Mark all as read error:", error);
+      toast.error("Failed to mark all as read");
+    }
   };
 
-  const deleteNotification = (id: string) => {
+  const deleteNotification = async (id: string) => {
+    const notification = notifications.find(n => n.id === id);
+
+    // Optimistic update
     setNotifications(notifications.filter((n) => n.id !== id));
+    setStats(prev => ({
+      ...prev,
+      total: prev.total - 1,
+      unread: notification && !notification.read ? prev.unread - 1 : prev.unread,
+      actionRequired: notification?.actionRequired ? prev.actionRequired - 1 : prev.actionRequired,
+      errors: notification?.type === "error" ? prev.errors - 1 : prev.errors,
+    }));
+
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationIds: [id] }),
+      });
+    } catch (error) {
+      console.error("Delete notification error:", error);
+    }
   };
 
-  const clearResolved = () => {
+  const clearResolved = async () => {
+    // Optimistic update
+    const resolvedIds = notifications
+      .filter(n => !n.actionRequired && n.read)
+      .map(n => n.id);
+
     setNotifications(notifications.filter((n) => n.actionRequired || !n.read));
+
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearResolved: true }),
+      });
+      toast.success("Resolved notifications cleared");
+      fetchNotifications(); // Refresh stats
+    } catch (error) {
+      console.error("Clear resolved error:", error);
+      toast.error("Failed to clear resolved");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -235,8 +269,14 @@ export default function AdminNotificationsPage() {
           <p className="text-gray-600 mt-1">Monitor platform alerts and system events</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <RefreshCw className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => fetchNotifications(true)}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button variant="outline" size="sm" className="gap-2">
@@ -302,6 +342,7 @@ export default function AdminNotificationsPage() {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search notifications..."
               className="pl-10"
             />
@@ -310,7 +351,10 @@ export default function AdminNotificationsPage() {
             <Filter className="w-4 h-4 text-gray-400" />
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as FilterType)}
+              onChange={(e) => {
+                setFilter(e.target.value as FilterType);
+                setTimeout(() => handleSearch(), 0);
+              }}
               className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Notifications</option>
@@ -389,7 +433,7 @@ export default function AdminNotificationsPage() {
                         <p className="text-sm text-gray-600 mt-1">
                           {notification.description}
                         </p>
-                        <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
+                        <p className="text-xs text-gray-400 mt-2">{formatTime(notification.time)}</p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {!notification.read && (
