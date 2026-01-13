@@ -33,30 +33,52 @@ function getEmailProvider(): "resend" | "smtp" | null {
   return null;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType: string;
+}
+
 export interface EmailData {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  attachments?: EmailAttachment[];
 }
 
-export async function sendEmail({ to, subject, html, from }: EmailData) {
+export async function sendEmail({ to, subject, html, from, attachments }: EmailData) {
   const provider = getEmailProvider();
   const fromAddress = from || `Humanly Staffing <${process.env.EMAIL_FROM || "contact@humanlystaffing.com"}>`;
 
   if (!provider) {
-    console.log("Email not configured. Would have sent:", { to, subject });
+    console.log("Email not configured. Would have sent:", { to, subject, attachments: attachments?.map(a => a.filename) });
     return { id: "mock-email-" + Date.now() };
   }
 
   try {
     if (provider === "resend" && resend) {
-      const { data, error } = await resend.emails.send({
+      const emailPayload: {
+        from: string;
+        to: string[];
+        subject: string;
+        html: string;
+        attachments?: { filename: string; content: Buffer }[];
+      } = {
         from: fromAddress,
         to: [to],
         subject,
         html,
-      });
+      };
+
+      if (attachments && attachments.length > 0) {
+        emailPayload.attachments = attachments.map(att => ({
+          filename: att.filename,
+          content: Buffer.from(att.content),
+        }));
+      }
+
+      const { data, error } = await resend.emails.send(emailPayload);
 
       if (error) {
         console.error("Resend email error:", error);
@@ -68,13 +90,30 @@ export async function sendEmail({ to, subject, html, from }: EmailData) {
     }
 
     if (provider === "smtp") {
-      const info = await smtpTransporter.sendMail({
+      const mailOptions: {
+        from: string;
+        to: string;
+        subject: string;
+        html: string;
+        text: string;
+        attachments?: { filename: string; content: string; contentType: string }[];
+      } = {
         from: fromAddress,
         to,
         subject,
         html,
         text: html.replace(/<[^>]*>/g, ""),
-      });
+      };
+
+      if (attachments && attachments.length > 0) {
+        mailOptions.attachments = attachments.map(att => ({
+          filename: att.filename,
+          content: att.content,
+          contentType: att.contentType,
+        }));
+      }
+
+      const info = await smtpTransporter.sendMail(mailOptions);
 
       console.log("Email sent via SMTP:", info.messageId);
       return { id: info.messageId };
@@ -83,6 +122,31 @@ export async function sendEmail({ to, subject, html, from }: EmailData) {
     console.error("Failed to send email:", error);
     throw error;
   }
+}
+
+// Helper function to send form submission with JSON attachment
+export async function sendFormSubmissionEmail(
+  formType: string,
+  formData: Record<string, unknown>,
+  subject: string,
+  htmlContent: string
+) {
+  const jsonContent = JSON.stringify(formData, null, 2);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `${formType}-submission-${timestamp}.json`;
+
+  return sendEmail({
+    to: "contact@humanlystaffing.com",
+    subject,
+    html: htmlContent,
+    attachments: [
+      {
+        filename,
+        content: jsonContent,
+        contentType: "application/json",
+      },
+    ],
+  });
 }
 
 // Email Templates

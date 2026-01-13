@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, Phone } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { siteConfig, navigation } from "@/lib/config";
 import { Button } from "@/components/ui/button";
@@ -97,13 +97,6 @@ export function Header() {
 
         {/* Desktop CTA buttons */}
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
-          <a
-            href={`tel:${siteConfig.contact.phone.replace(/[^0-9]/g, "")}`}
-            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-          >
-            <Phone className="h-4 w-4" />
-            {siteConfig.contact.phone}
-          </a>
           <Button asChild size="sm">
             <Link href="/employers/request-talent">Hire Talent</Link>
           </Button>
@@ -186,13 +179,6 @@ export function Header() {
                     ))}
                   </div>
                   <div className="py-6 space-y-3">
-                    <a
-                      href={`tel:${siteConfig.contact.phone.replace(/[^0-9]/g, "")}`}
-                      className="flex items-center gap-2 text-sm font-medium text-gray-700"
-                    >
-                      <Phone className="h-4 w-4" />
-                      {siteConfig.contact.phone}
-                    </a>
                     <Button asChild className="w-full">
                       <Link href="/employers/request-talent" onClick={() => setMobileMenuOpen(false)}>
                         Hire Talent

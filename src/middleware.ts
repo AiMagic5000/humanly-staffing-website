@@ -1,4 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
@@ -28,11 +30,31 @@ const _isPublicRoute = createRouteMatcher([
   '/api/webhooks(.*)',
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
+// Check if Clerk is properly configured
+const isClerkConfigured = () => {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return key && key.startsWith('pk_') && !key.includes('placeholder');
+};
+
+// Development bypass middleware
+function devMiddleware(request: NextRequest) {
+  if (isProtectedRoute(request)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/sign-in';
+    url.searchParams.set('dev_mode', 'true');
+    return NextResponse.redirect(url);
   }
-});
+  return NextResponse.next();
+}
+
+// Export appropriate middleware based on configuration
+export default isClerkConfigured()
+  ? clerkMiddleware(async (auth, req) => {
+      if (isProtectedRoute(req)) {
+        await auth.protect();
+      }
+    })
+  : devMiddleware;
 
 export const config = {
   matcher: [

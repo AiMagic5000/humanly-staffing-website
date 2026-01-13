@@ -24,9 +24,16 @@ const clientLogos = [
 ];
 
 const reviews = [
-  { name: "Sarah M.", role: "HR Director", company: "TechCorp", rating: 5 },
-  { name: "James L.", role: "CEO", company: "StartupXYZ", rating: 5 },
-  { name: "Maria G.", role: "Hiring Manager", company: "HealthFirst", rating: 5 },
+  { name: "Sarah M.", role: "HR Director", company: "TechCorp", rating: 5, image: "https://randomuser.me/api/portraits/women/44.jpg" },
+  { name: "James L.", role: "CEO", company: "StartupXYZ", rating: 5, image: "https://randomuser.me/api/portraits/men/32.jpg" },
+  { name: "Maria G.", role: "Hiring Manager", company: "HealthFirst", rating: 5, image: "https://randomuser.me/api/portraits/women/68.jpg" },
+];
+
+const trustBadgeImages = [
+  "https://randomuser.me/api/portraits/women/22.jpg",
+  "https://randomuser.me/api/portraits/men/45.jpg",
+  "https://randomuser.me/api/portraits/women/56.jpg",
+  "https://randomuser.me/api/portraits/men/67.jpg",
 ];
 
 export function Hero() {
@@ -59,15 +66,15 @@ export function Hero() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 mb-6"
             >
               <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
+                {trustBadgeImages.map((img, i) => (
+                  <Image
                     key={i}
-                    className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white flex items-center justify-center"
-                  >
-                    <span className="text-[10px] font-bold text-white">
-                      {String.fromCharCode(64 + i)}
-                    </span>
-                  </div>
+                    src={img}
+                    alt={`Customer ${i + 1}`}
+                    width={28}
+                    height={28}
+                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
+                  />
                 ))}
               </div>
               <span className="text-sm font-medium text-blue-900">
@@ -187,14 +194,14 @@ export function Hero() {
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-3">
                   {reviews.map((review, i) => (
-                    <div
+                    <Image
                       key={i}
-                      className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border-2 border-white flex items-center justify-center shadow-md"
-                    >
-                      <span className="text-xs font-bold text-white">
-                        {review.name.split(" ").map(n => n[0]).join("")}
-                      </span>
-                    </div>
+                      src={review.image}
+                      alt={review.name}
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full border-2 border-white object-cover shadow-md"
+                    />
                   ))}
                 </div>
                 <div>
@@ -266,9 +273,13 @@ export function Hero() {
                   &quot;Found the perfect candidate in just 10 days!&quot;
                 </p>
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">SM</span>
-                  </div>
+                  <Image
+                    src="https://randomuser.me/api/portraits/women/44.jpg"
+                    alt="Sarah Mitchell"
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
                   <div>
                     <p className="text-xs font-semibold text-gray-900">Sarah Mitchell</p>
                     <p className="text-xs text-gray-500">HR Director, TechCorp</p>

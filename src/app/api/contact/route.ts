@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { sendFormSubmissionEmail, emailTemplates } from "@/lib/email";
 
 const contactSchema = z.object({
   name: z.string().min(2),
@@ -16,24 +17,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = contactSchema.parse(body);
 
-    // In production, this would:
-    // 1. Send email notification to admin
-    // 2. Send confirmation email to user
-    // 3. Store in database
-
     console.log("Contact form submission:", validatedData);
 
-    // Simulate email sending
-    // await sendEmail({
-    //   to: "contact@humanlystaffing.com",
-    //   ...emailTemplates.contactFormNotification({
-    //     name: validatedData.name,
-    //     email: validatedData.email,
-    //     phone: validatedData.phone || "Not provided",
-    //     subject: validatedData.subject,
-    //     message: validatedData.message,
-    //   }),
-    // });
+    // Send email to admin with JSON attachment
+    try {
+      const emailHtml = emailTemplates.contactFormNotification({
+        name: validatedData.name,
+        email: validatedData.email,
+        phone: validatedData.phone || "Not provided",
+        subject: validatedData.subject,
+        message: validatedData.message,
+      }).html;
+
+      await sendFormSubmissionEmail(
+        "contact-form",
+        {
+          ...validatedData,
+          submittedAt: new Date().toISOString(),
+          formType: "Contact Form",
+        },
+        `Contact Form: ${validatedData.subject} - ${validatedData.name}`,
+        emailHtml
+      );
+    } catch (emailError) {
+      console.error("Failed to send contact form email:", emailError);
+      // Don't fail the request if email fails
+    }
 
     return NextResponse.json(
       { success: true, message: "Message sent successfully" },

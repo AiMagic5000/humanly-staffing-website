@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Linkedin, Mail } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -12,37 +13,37 @@ const team = [
     name: "Antonio Goldwire",
     role: "Founder & CEO",
     bio: "Antonio founded Humanly Staffing with a vision to transform how companies and talent connect. With over 15 years in recruitment, he leads our strategic direction.",
-    image: "/team/ceo.jpg",
+    image: "https://randomuser.me/api/portraits/men/32.jpg",
   },
   {
     name: "Sarah Mitchell",
     role: "VP of Operations",
     bio: "Sarah ensures our operations run smoothly and efficiently. Her background in HR consulting brings valuable insights to our processes.",
-    image: "/team/vp-ops.jpg",
+    image: "https://randomuser.me/api/portraits/women/44.jpg",
   },
   {
     name: "Michael Chen",
     role: "Director of Technology Recruiting",
     bio: "Michael leads our IT and technology staffing division. His engineering background helps him understand client needs deeply.",
-    image: "/team/tech-director.jpg",
+    image: "https://randomuser.me/api/portraits/men/52.jpg",
   },
   {
     name: "Jennifer Rodriguez",
     role: "Director of Healthcare Recruiting",
     bio: "Jennifer brings 10+ years of healthcare recruiting experience, specializing in nursing and allied health placements.",
-    image: "/team/healthcare-director.jpg",
+    image: "https://randomuser.me/api/portraits/women/68.jpg",
   },
   {
     name: "David Park",
     role: "Senior Account Executive",
     bio: "David manages relationships with our largest enterprise clients, ensuring they receive exceptional service and results.",
-    image: "/team/account-exec.jpg",
+    image: "https://randomuser.me/api/portraits/men/76.jpg",
   },
   {
     name: "Amanda Torres",
     role: "Talent Acquisition Manager",
     bio: "Amanda leads our candidate sourcing efforts, building pipelines of top talent across all industries.",
-    image: "/team/talent-manager.jpg",
+    image: "https://randomuser.me/api/portraits/women/89.jpg",
   },
 ];
 
@@ -70,10 +71,13 @@ export default function TeamPage() {
                 key={member.name}
                 className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <div className="aspect-square bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
-                  <div className="w-32 h-32 rounded-full bg-blue-200 flex items-center justify-center text-4xl font-bold text-blue-600">
-                    {member.name.split(" ").map((n) => n[0]).join("")}
-                  </div>
+                <div className="relative aspect-square bg-gradient-to-br from-blue-100 to-blue-50">
+                  <Image
+                    src={member.image}
+                    alt={member.name}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-900">{member.name}</h3>

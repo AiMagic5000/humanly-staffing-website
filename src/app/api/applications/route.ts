@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
-import { sendEmail, emailTemplates } from "@/lib/email";
+import { sendEmail, sendFormSubmissionEmail, emailTemplates } from "@/lib/email";
 
 const applicationSchema = z.object({
   jobId: z.string(),
@@ -113,17 +113,26 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails
     }
 
-    // Send notification email to admin
+    // Send notification email to admin with JSON attachment
     try {
-      await sendEmail({
-        to: process.env.EMAIL_FROM || "contact@humanlystaffing.com",
-        ...emailTemplates.newApplicationAdmin({
-          candidateName: `${validatedData.firstName} ${validatedData.lastName}`,
-          candidateEmail: validatedData.email,
-          jobTitle: "Job Application",
+      const adminEmailHtml = emailTemplates.newApplicationAdmin({
+        candidateName: `${validatedData.firstName} ${validatedData.lastName}`,
+        candidateEmail: validatedData.email,
+        jobTitle: "Job Application",
+        applicationId: application.id,
+      }).html;
+
+      await sendFormSubmissionEmail(
+        "job-application",
+        {
+          ...validatedData,
           applicationId: application.id,
-        }),
-      });
+          submittedAt: new Date().toISOString(),
+          formType: "Job Application",
+        },
+        `New Job Application: ${validatedData.firstName} ${validatedData.lastName}`,
+        adminEmailHtml
+      );
     } catch (emailError) {
       console.error("Failed to send admin notification:", emailError);
     }

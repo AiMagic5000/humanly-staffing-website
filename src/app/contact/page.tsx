@@ -362,12 +362,28 @@ export default function ContactPage() {
       {/* Map Section */}
       <section className="py-12 bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
-          <div className="bg-gray-200 rounded-2xl h-96 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Interactive map would go here</p>
-              <p className="text-sm text-gray-500 mt-2">{siteConfig.contact.address.full}</p>
-            </div>
+          <div className="rounded-2xl overflow-hidden h-96">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3006.8267082456!2d-104.80199432357866!3d41.13071181134131!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x876f3e8c9a8c0001%3A0x1234567890abcdef!2s1501%20S%20Greeley%20Hwy%2C%20Cheyenne%2C%20WY%2082007!5e0!3m2!1sen!2sus!4v1704067200000!5m2!1sen!2sus"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title={`Map showing ${siteConfig.contact.address.full}`}
+            />
+          </div>
+          <div className="mt-4 text-center">
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(siteConfig.contact.address.full)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              <MapPin className="w-4 h-4" />
+              Get Directions
+            </a>
           </div>
         </div>
       </section>
