@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -11,79 +12,114 @@ import {
   Users,
   BarChart3,
   Calendar,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-// Mock analytics data
-const overviewStats = [
-  {
-    label: "Total Views",
-    value: "4,328",
-    change: "+18.2%",
-    changeType: "positive" as const,
-    icon: Eye,
-    description: "vs. last month",
-  },
-  {
-    label: "Applications",
-    value: "187",
-    change: "+24.5%",
-    changeType: "positive" as const,
-    icon: FileText,
-    description: "vs. last month",
-  },
-  {
-    label: "Interviews",
-    value: "42",
-    change: "+12.3%",
-    changeType: "positive" as const,
-    icon: Calendar,
-    description: "vs. last month",
-  },
-  {
-    label: "Hires",
-    value: "8",
-    change: "-5.2%",
-    changeType: "negative" as const,
-    icon: UserCheck,
-    description: "vs. last month",
-  },
-];
+interface OverviewStat {
+  label: string;
+  value: number;
+  change: string;
+  changeType: "positive" | "negative";
+  description: string;
+}
 
-const jobPerformance = [
-  { title: "Senior Software Engineer", views: 1245, applications: 56, conversion: "4.5%", status: "Active" },
-  { title: "Product Manager", views: 987, applications: 43, conversion: "4.4%", status: "Active" },
-  { title: "UX Designer", views: 756, applications: 38, conversion: "5.0%", status: "Active" },
-  { title: "DevOps Engineer", views: 654, applications: 28, conversion: "4.3%", status: "Active" },
-  { title: "Data Analyst", views: 432, applications: 22, conversion: "5.1%", status: "Paused" },
-];
+interface JobPerformance {
+  title: string;
+  views: number;
+  applications: number;
+  conversion: string;
+  status: string;
+}
 
-const weeklyData = [
-  { day: "Mon", views: 156, applications: 8 },
-  { day: "Tue", views: 189, applications: 12 },
-  { day: "Wed", views: 234, applications: 15 },
-  { day: "Thu", views: 198, applications: 11 },
-  { day: "Fri", views: 167, applications: 9 },
-  { day: "Sat", views: 78, applications: 4 },
-  { day: "Sun", views: 65, applications: 3 },
-];
+interface WeeklyData {
+  day: string;
+  views: number;
+  applications: number;
+}
 
-const sourceData = [
-  { source: "Direct Search", applications: 67, percentage: 36 },
-  { source: "Job Boards", applications: 52, percentage: 28 },
-  { source: "Social Media", applications: 38, percentage: 20 },
-  { source: "Referrals", applications: 30, percentage: 16 },
-];
+interface SourceData {
+  source: string;
+  applications: number;
+  percentage: number;
+}
 
-const pipelineData = [
-  { stage: "Applied", count: 187, color: "bg-blue-500" },
-  { stage: "Screening", count: 89, color: "bg-purple-500" },
-  { stage: "Interview", count: 42, color: "bg-amber-500" },
-  { stage: "Offer", count: 12, color: "bg-emerald-500" },
-  { stage: "Hired", count: 8, color: "bg-green-600" },
-];
+interface PipelineData {
+  stage: string;
+  count: number;
+  color: string;
+}
+
+interface QuickStats {
+  activeJobs: number;
+  avgDaysToHire: number;
+  offerAcceptRate: number;
+  avgConversion: number;
+}
+
+interface AnalyticsData {
+  overviewStats: OverviewStat[];
+  jobPerformance: JobPerformance[];
+  weeklyData: WeeklyData[];
+  sourceData: SourceData[];
+  pipelineData: PipelineData[];
+  quickStats: QuickStats;
+}
+
+const iconMap: Record<string, React.ElementType> = {
+  "Total Views": Eye,
+  "Applications": FileText,
+  "Interviews": Calendar,
+  "Hires": UserCheck,
+};
 
 export default function EmployerAnalyticsPage() {
-  const maxViews = Math.max(...weeklyData.map(d => d.views));
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [timeRange, setTimeRange] = useState("30d");
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/employer/analytics");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAnalytics(result.data);
+        if (showToast) {
+          toast.success("Analytics refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch analytics");
+      }
+    } catch (error) {
+      console.error("Fetch analytics error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh analytics");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  if (loading || !analytics) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  const maxViews = Math.max(...analytics.weeklyData.map(d => d.views));
 
   return (
     <div className="space-y-8">
@@ -94,7 +130,21 @@ export default function EmployerAnalyticsPage() {
           <p className="text-gray-600 mt-1">Track your recruiting performance</p>
         </div>
         <div className="flex items-center gap-2">
-          <select className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAnalytics(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
@@ -105,30 +155,35 @@ export default function EmployerAnalyticsPage() {
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {overviewStats.map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl border p-6">
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                <stat.icon className="w-6 h-6 text-blue-600" />
+        {analytics.overviewStats.map((stat) => {
+          const Icon = iconMap[stat.label] || Eye;
+          return (
+            <div key={stat.label} className="bg-white rounded-xl border p-6">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <Icon className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className={`flex items-center gap-1 text-sm font-medium ${
+                  stat.changeType === "positive" ? "text-emerald-600" : "text-red-600"
+                }`}>
+                  {stat.changeType === "positive" ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  {stat.change}
+                </div>
               </div>
-              <div className={`flex items-center gap-1 text-sm font-medium ${
-                stat.changeType === "positive" ? "text-emerald-600" : "text-red-600"
-              }`}>
-                {stat.changeType === "positive" ? (
-                  <TrendingUp className="w-4 h-4" />
-                ) : (
-                  <TrendingDown className="w-4 h-4" />
-                )}
-                {stat.change}
+              <div className="mt-4">
+                <p className="text-3xl font-bold text-gray-900">
+                  {stat.value.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{stat.description}</p>
               </div>
             </div>
-            <div className="mt-4">
-              <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{stat.description}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Hiring Pipeline */}
@@ -143,13 +198,13 @@ export default function EmployerAnalyticsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {pipelineData.map((stage, index) => (
+          {analytics.pipelineData.map((stage, index) => (
             <div key={stage.stage} className="flex-1">
               <div className="relative">
                 <div className={`h-16 ${stage.color} rounded-lg flex items-center justify-center`}>
                   <span className="text-white font-bold text-xl">{stage.count}</span>
                 </div>
-                {index < pipelineData.length - 1 && (
+                {index < analytics.pipelineData.length - 1 && (
                   <div className="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center z-10">
                     <span className="text-gray-400 text-xs">→</span>
                   </div>
@@ -174,7 +229,7 @@ export default function EmployerAnalyticsPage() {
             </div>
           </div>
           <div className="space-y-4">
-            {weeklyData.map((data) => (
+            {analytics.weeklyData.map((data) => (
               <div key={data.day} className="flex items-center gap-4">
                 <span className="w-10 text-sm text-gray-600">{data.day}</span>
                 <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
@@ -214,7 +269,7 @@ export default function EmployerAnalyticsPage() {
             </div>
           </div>
           <div className="space-y-4">
-            {sourceData.map((source, index) => {
+            {analytics.sourceData.map((source, index) => {
               const colors = [
                 "bg-blue-500",
                 "bg-purple-500",
@@ -275,7 +330,7 @@ export default function EmployerAnalyticsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {jobPerformance.map((job, index) => (
+              {analytics.jobPerformance.map((job, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <p className="font-medium text-gray-900">{job.title}</p>
@@ -311,22 +366,22 @@ export default function EmployerAnalyticsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
           <Briefcase className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">12</p>
+          <p className="text-3xl font-bold">{analytics.quickStats.activeJobs}</p>
           <p className="text-sm text-blue-100 mt-1">Active Jobs</p>
         </div>
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
           <Clock className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">3.2</p>
+          <p className="text-3xl font-bold">{analytics.quickStats.avgDaysToHire}</p>
           <p className="text-sm text-purple-100 mt-1">Avg. Days to Hire</p>
         </div>
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
           <UserCheck className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">92%</p>
+          <p className="text-3xl font-bold">{analytics.quickStats.offerAcceptRate}%</p>
           <p className="text-sm text-emerald-100 mt-1">Offer Accept Rate</p>
         </div>
         <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white">
           <TrendingUp className="w-8 h-8 mb-4 opacity-80" />
-          <p className="text-3xl font-bold">4.7%</p>
+          <p className="text-3xl font-bold">{analytics.quickStats.avgConversion}%</p>
           <p className="text-sm text-amber-100 mt-1">Avg. Conversion</p>
         </div>
       </div>
