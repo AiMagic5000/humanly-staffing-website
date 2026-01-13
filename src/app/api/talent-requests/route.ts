@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabase";
 import { z } from "zod";
 import { sendFormSubmissionEmail } from "@/lib/email";
