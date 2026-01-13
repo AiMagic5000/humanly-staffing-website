@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -13,8 +14,53 @@ import {
   Mail,
   AlertCircle,
   Activity,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+interface Analytics {
+  overview: {
+    totalUsers: number;
+    activeJobs: number;
+    totalApplications: number;
+    totalCompanies: number;
+    totalCandidates: number;
+    totalPlacements: number;
+    totalRevenue: number;
+  };
+  changes: {
+    users: number;
+    jobs: number;
+    applications: number;
+    companies: number;
+    placements: number;
+    revenue: number;
+  };
+  recentApplications: {
+    id: string;
+    candidate: string;
+    avatar: string;
+    job: string;
+    company: string;
+    appliedAt: string;
+    status: string;
+  }[];
+  newUsers: {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string;
+    type: string;
+    joinedAt: string;
+  }[];
+  pendingActions: {
+    companyVerifications: number;
+    jobReviews: number;
+    supportTickets: number;
+  };
+}
 
 // Calculate greeting based on time of day
 function getGreeting(): string {
@@ -24,142 +70,19 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-const stats = [
-  {
-    name: "Total Users",
-    value: "2,847",
-    change: "+12%",
-    changeType: "positive",
-    icon: Users,
-    href: "/admin/users",
-  },
-  {
-    name: "Active Jobs",
-    value: "156",
-    change: "+8%",
-    changeType: "positive",
-    icon: Briefcase,
-    href: "/admin/jobs",
-  },
-  {
-    name: "Applications",
-    value: "1,234",
-    change: "+23%",
-    changeType: "positive",
-    icon: FileText,
-    href: "/admin/applications",
-  },
-  {
-    name: "Companies",
-    value: "89",
-    change: "+5%",
-    changeType: "positive",
-    icon: Building2,
-    href: "/admin/companies",
-  },
-];
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
 
-const recentApplications = [
-  {
-    id: 1,
-    candidate: "Sarah Johnson",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-    job: "Senior Software Engineer",
-    company: "TechCorp Inc.",
-    appliedAt: "2 hours ago",
-    status: "new",
-  },
-  {
-    id: 2,
-    candidate: "Michael Chen",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-    job: "Product Manager",
-    company: "StartupXYZ",
-    appliedAt: "5 hours ago",
-    status: "reviewing",
-  },
-  {
-    id: 3,
-    candidate: "Emily Rodriguez",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-    job: "UX Designer",
-    company: "DesignCo",
-    appliedAt: "1 day ago",
-    status: "shortlisted",
-  },
-  {
-    id: 4,
-    candidate: "David Kim",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-    job: "Backend Developer",
-    company: "CloudServices",
-    appliedAt: "1 day ago",
-    status: "interviewed",
-  },
-  {
-    id: 5,
-    candidate: "Jennifer Lee",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-    job: "Data Analyst",
-    company: "DataDriven",
-    appliedAt: "2 days ago",
-    status: "hired",
-  },
-];
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-const newUsers = [
-  {
-    id: 1,
-    name: "John Smith",
-    email: "john.smith@email.com",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
-    type: "candidate",
-    joinedAt: "1 hour ago",
-  },
-  {
-    id: 2,
-    name: "Lisa Anderson",
-    email: "lisa@techcorp.com",
-    avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=100&h=100&fit=crop",
-    type: "employer",
-    joinedAt: "3 hours ago",
-  },
-  {
-    id: 3,
-    name: "Robert Wilson",
-    email: "robert.wilson@email.com",
-    avatar: "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100&h=100&fit=crop",
-    type: "candidate",
-    joinedAt: "5 hours ago",
-  },
-];
-
-const pendingActions = [
-  {
-    id: 1,
-    type: "company_verification",
-    title: "Company Verification Required",
-    description: "NewStartup Inc. needs verification",
-    priority: "high",
-    icon: Building2,
-  },
-  {
-    id: 2,
-    type: "job_review",
-    title: "Job Posting Review",
-    description: "3 new job postings awaiting approval",
-    priority: "medium",
-    icon: Briefcase,
-  },
-  {
-    id: 3,
-    type: "support_ticket",
-    title: "Support Tickets",
-    description: "5 unresolved support requests",
-    priority: "medium",
-    icon: Mail,
-  },
-];
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   new: { bg: "bg-blue-100", text: "text-blue-700", label: "New" },
@@ -170,16 +93,139 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
 };
 
 export default function AdminDashboard() {
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const greeting = getGreeting();
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/admin/analytics");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAnalytics(result.data);
+        if (showToast) {
+          toast.success("Dashboard refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch analytics");
+      }
+    } catch (error) {
+      console.error("Fetch analytics error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh dashboard");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-gray-600">Failed to load dashboard data</p>
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      name: "Total Users",
+      value: analytics.overview.totalUsers.toLocaleString(),
+      change: `+${analytics.changes.users}%`,
+      changeType: "positive",
+      icon: Users,
+      href: "/admin/users",
+    },
+    {
+      name: "Active Jobs",
+      value: analytics.overview.activeJobs.toLocaleString(),
+      change: `+${analytics.changes.jobs}%`,
+      changeType: "positive",
+      icon: Briefcase,
+      href: "/admin/jobs",
+    },
+    {
+      name: "Applications",
+      value: analytics.overview.totalApplications.toLocaleString(),
+      change: `+${analytics.changes.applications}%`,
+      changeType: "positive",
+      icon: FileText,
+      href: "/admin/applications",
+    },
+    {
+      name: "Companies",
+      value: analytics.overview.totalCompanies.toLocaleString(),
+      change: `+${analytics.changes.companies}%`,
+      changeType: "positive",
+      icon: Building2,
+      href: "/admin/companies",
+    },
+  ];
+
+  const pendingActions = [
+    {
+      id: 1,
+      type: "company_verification",
+      title: "Company Verification Required",
+      description: `${analytics.pendingActions.companyVerifications} compan${analytics.pendingActions.companyVerifications > 1 ? "ies" : "y"} need${analytics.pendingActions.companyVerifications === 1 ? "s" : ""} verification`,
+      priority: "high",
+      icon: Building2,
+    },
+    {
+      id: 2,
+      type: "job_review",
+      title: "Job Posting Review",
+      description: `${analytics.pendingActions.jobReviews} new job postings awaiting approval`,
+      priority: "medium",
+      icon: Briefcase,
+    },
+    {
+      id: 3,
+      type: "support_ticket",
+      title: "Support Tickets",
+      description: `${analytics.pendingActions.supportTickets} unresolved support requests`,
+      priority: "medium",
+      icon: Mail,
+    },
+  ];
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}, Admin!</h1>
-        <p className="text-gray-600 mt-1">
-          Here&apos;s what&apos;s happening on your platform today.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{greeting}, Admin!</h1>
+          <p className="text-gray-600 mt-1">
+            Here&apos;s what&apos;s happening on your platform today.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchAnalytics(true)}
+          disabled={refreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats */}
@@ -269,7 +315,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {recentApplications.map((application) => (
+            {analytics.recentApplications.map((application) => (
               <div key={application.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <Image
@@ -288,12 +334,12 @@ export default function AdminDashboard() {
                   <div className="text-right">
                     <span
                       className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${
-                        statusConfig[application.status].bg
-                      } ${statusConfig[application.status].text}`}
+                        statusConfig[application.status]?.bg || "bg-gray-100"
+                      } ${statusConfig[application.status]?.text || "text-gray-700"}`}
                     >
-                      {statusConfig[application.status].label}
+                      {statusConfig[application.status]?.label || application.status}
                     </span>
-                    <p className="text-xs text-gray-500 mt-1">{application.appliedAt}</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatTimeAgo(application.appliedAt)}</p>
                   </div>
                 </div>
               </div>
@@ -314,7 +360,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {newUsers.map((user) => (
+            {analytics.newUsers.map((user) => (
               <div key={user.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <Image
@@ -338,7 +384,7 @@ export default function AdminDashboard() {
                     >
                       {user.type === "employer" ? "Employer" : "Candidate"}
                     </span>
-                    <p className="text-xs text-gray-500 mt-1">{user.joinedAt}</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatTimeAgo(user.joinedAt)}</p>
                   </div>
                 </div>
               </div>
