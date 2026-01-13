@@ -13,7 +13,9 @@ import {
   Users,
   BarChart3,
   Menu,
-  X
+  X,
+  MessageSquare,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -24,6 +26,8 @@ const candidateNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "My Applications", href: "/dashboard/applications", icon: FileText },
   { name: "Saved Jobs", href: "/dashboard/saved-jobs", icon: Bookmark },
+  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "Profile", href: "/dashboard/profile", icon: User },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

@@ -15,6 +15,7 @@ import {
   BarChart3,
   Search,
   Settings,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Job Postings", href: "/employer/jobs", icon: Briefcase },
   { name: "Applications", href: "/employer/applications", icon: Users },
   { name: "Find Candidates", href: "/employer/candidates", icon: Search },
+  { name: "Messages", href: "/employer/messages", icon: MessageSquare },
   { name: "Analytics", href: "/employer/analytics", icon: BarChart3 },
   { name: "Company Profile", href: "/employer/company", icon: Building2 },
   { name: "Settings", href: "/employer/settings", icon: Settings },
