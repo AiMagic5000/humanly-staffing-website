@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Building2,
@@ -17,55 +17,183 @@ import {
   Instagram,
   Plus,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Mock company data
-const mockCompany = {
-  name: "TechCorp Inc.",
-  logo: "https://images.unsplash.com/photo-1549924231-f129b911e442?w=200&h=200&fit=crop",
-  banner: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=400&fit=crop",
-  tagline: "Building the future of technology, one innovation at a time",
-  website: "https://techcorp.com",
-  industry: "Technology",
-  size: "501-1000 employees",
-  founded: "2010",
-  headquarters: "San Francisco, CA",
-  locations: ["San Francisco, CA", "New York, NY", "Austin, TX", "Seattle, WA"],
-  about: "TechCorp Inc. is a leading technology company specializing in enterprise software solutions. We build innovative products that help businesses transform and scale. Our mission is to empower organizations with cutting-edge technology that drives growth and efficiency.",
-  culture: "We believe in fostering a culture of innovation, collaboration, and continuous learning. Our team is diverse, inclusive, and committed to excellence. We offer flexible work arrangements, competitive benefits, and opportunities for professional growth.",
-  benefits: [
-    "Competitive salary and equity",
-    "Health, dental, and vision insurance",
-    "401(k) with company match",
-    "Unlimited PTO",
-    "Remote work options",
-    "Professional development budget",
-    "Wellness programs",
-    "Parental leave",
-  ],
+interface SocialLinks {
+  linkedin: string;
+  twitter: string;
+  instagram: string;
+}
+
+interface Company {
+  name: string;
+  logoUrl: string;
+  bannerUrl: string;
+  tagline: string;
+  website: string;
+  industry: string;
+  size: string;
+  founded: string;
+  headquarters: string;
+  locations: string[];
+  about: string;
+  culture: string;
+  benefits: string[];
+  socialLinks: SocialLinks;
+}
+
+const defaultCompany: Company = {
+  name: "",
+  logoUrl: "https://images.unsplash.com/photo-1549924231-f129b911e442?w=200&h=200&fit=crop",
+  bannerUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=400&fit=crop",
+  tagline: "",
+  website: "",
+  industry: "technology",
+  size: "1-10",
+  founded: "",
+  headquarters: "",
+  locations: [],
+  about: "",
+  culture: "",
+  benefits: [],
   socialLinks: {
-    linkedin: "https://linkedin.com/company/techcorp",
-    twitter: "https://twitter.com/techcorp",
-    instagram: "https://instagram.com/techcorp",
-  },
-  stats: {
-    employees: 750,
-    offices: 4,
-    openJobs: 12,
-    avgTenure: "3.5 years",
+    linkedin: "",
+    twitter: "",
+    instagram: "",
   },
 };
 
-export default function CompanyProfilePage() {
-  const [saved, setSaved] = useState(false);
-  const [company, setCompany] = useState(mockCompany);
+const industries = [
+  { value: "technology", label: "Technology" },
+  { value: "healthcare", label: "Healthcare" },
+  { value: "finance", label: "Finance" },
+  { value: "manufacturing", label: "Manufacturing" },
+  { value: "retail", label: "Retail" },
+  { value: "education", label: "Education" },
+  { value: "other", label: "Other" },
+];
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+const companySizes = [
+  { value: "1-10", label: "1-10 employees" },
+  { value: "11-50", label: "11-50 employees" },
+  { value: "51-200", label: "51-200 employees" },
+  { value: "201-500", label: "201-500 employees" },
+  { value: "501-1000", label: "501-1000 employees" },
+  { value: "1001+", label: "1001+ employees" },
+];
+
+export default function CompanyProfilePage() {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [company, setCompany] = useState<Company>(defaultCompany);
+  const [newBenefit, setNewBenefit] = useState("");
+  const [newLocation, setNewLocation] = useState("");
+
+  // Load company on mount
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const response = await fetch("/api/companies");
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setCompany({
+            ...defaultCompany,
+            ...result.data,
+            socialLinks: {
+              ...defaultCompany.socialLinks,
+              ...result.data.socialLinks,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch company:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, []);
+
+  const handleSave = async () => {
+    if (!company.name.trim()) {
+      toast.error("Company name is required");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/companies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(company),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save company");
+      }
+
+      setSaved(true);
+      toast.success("Company profile saved successfully!");
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save company");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const addBenefit = () => {
+    if (newBenefit.trim() && !company.benefits.includes(newBenefit.trim())) {
+      setCompany({
+        ...company,
+        benefits: [...company.benefits, newBenefit.trim()],
+      });
+      setNewBenefit("");
+    }
+  };
+
+  const removeBenefit = (benefitToRemove: string) => {
+    setCompany({
+      ...company,
+      benefits: company.benefits.filter((b) => b !== benefitToRemove),
+    });
+  };
+
+  const addLocation = () => {
+    if (newLocation.trim() && !company.locations.includes(newLocation.trim())) {
+      setCompany({
+        ...company,
+        locations: [...company.locations, newLocation.trim()],
+      });
+      setNewLocation("");
+    }
+  };
+
+  const removeLocation = (locationToRemove: string) => {
+    setCompany({
+      ...company,
+      locations: company.locations.filter((l) => l !== locationToRemove),
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -77,10 +205,17 @@ export default function CompanyProfilePage() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" asChild>
-            <a href="/company/techcorp" target="_blank">Preview Profile</a>
+            <a href={`/company/${company.name.toLowerCase().replace(/\s+/g, "-")}`} target="_blank">
+              Preview Profile
+            </a>
           </Button>
-          <Button onClick={handleSave} className="gap-2">
-            {saved ? (
+          <Button onClick={handleSave} className="gap-2" disabled={saving}>
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
               <>
                 <Check className="w-4 h-4" />
                 Saved
@@ -99,7 +234,7 @@ export default function CompanyProfilePage() {
       <div className="bg-white rounded-xl border overflow-hidden">
         <div className="relative h-48 bg-gradient-to-r from-blue-600 to-blue-800">
           <Image
-            src={company.banner}
+            src={company.bannerUrl || defaultCompany.bannerUrl}
             alt="Company banner"
             fill
             className="object-cover opacity-80"
@@ -112,8 +247,8 @@ export default function CompanyProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 relative z-10">
             <div className="relative">
               <Image
-                src={company.logo}
-                alt={company.name}
+                src={company.logoUrl || defaultCompany.logoUrl}
+                alt={company.name || "Company logo"}
                 width={100}
                 height={100}
                 className="rounded-xl border-4 border-white shadow-lg object-cover"
@@ -123,8 +258,8 @@ export default function CompanyProfilePage() {
               </button>
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">{company.name}</h2>
-              <p className="text-gray-600">{company.tagline}</p>
+              <h2 className="text-xl font-bold text-gray-900">{company.name || "Your Company"}</h2>
+              <p className="text-gray-600">{company.tagline || "Add a tagline"}</p>
             </div>
           </div>
         </div>
@@ -139,11 +274,12 @@ export default function CompanyProfilePage() {
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Name
+                  Company Name *
                 </label>
                 <Input
                   value={company.name}
                   onChange={(e) => setCompany({ ...company, name: e.target.value })}
+                  placeholder="Your company name"
                 />
               </div>
               <div>
@@ -156,6 +292,7 @@ export default function CompanyProfilePage() {
                     value={company.website}
                     onChange={(e) => setCompany({ ...company, website: e.target.value })}
                     className="pl-10"
+                    placeholder="https://yourcompany.com"
                   />
                 </div>
               </div>
@@ -173,26 +310,32 @@ export default function CompanyProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Industry
                 </label>
-                <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="technology">Technology</option>
-                  <option value="healthcare">Healthcare</option>
-                  <option value="finance">Finance</option>
-                  <option value="manufacturing">Manufacturing</option>
-                  <option value="retail">Retail</option>
-                  <option value="education">Education</option>
+                <select
+                  value={company.industry}
+                  onChange={(e) => setCompany({ ...company, industry: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {industries.map((ind) => (
+                    <option key={ind.value} value={ind.value}>
+                      {ind.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Company Size
                 </label>
-                <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="1-10">1-10 employees</option>
-                  <option value="11-50">11-50 employees</option>
-                  <option value="51-200">51-200 employees</option>
-                  <option value="201-500">201-500 employees</option>
-                  <option value="501-1000">501-1000 employees</option>
-                  <option value="1001+">1001+ employees</option>
+                <select
+                  value={company.size}
+                  onChange={(e) => setCompany({ ...company, size: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {companySizes.map((size) => (
+                    <option key={size.value} value={size.value}>
+                      {size.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -202,6 +345,7 @@ export default function CompanyProfilePage() {
                 <Input
                   value={company.founded}
                   onChange={(e) => setCompany({ ...company, founded: e.target.value })}
+                  placeholder="2020"
                 />
               </div>
               <div>
@@ -214,6 +358,7 @@ export default function CompanyProfilePage() {
                     value={company.headquarters}
                     onChange={(e) => setCompany({ ...company, headquarters: e.target.value })}
                     className="pl-10"
+                    placeholder="City, State"
                   />
                 </div>
               </div>
@@ -255,50 +400,84 @@ export default function CompanyProfilePage() {
           <div className="bg-white rounded-xl border p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-semibold text-gray-900">Benefits & Perks</h3>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Benefit
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Add a benefit"
+                  value={newBenefit}
+                  onChange={(e) => setNewBenefit(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addBenefit()}
+                  className="w-40"
+                />
+                <Button variant="outline" size="sm" onClick={addBenefit}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {company.benefits.map((benefit, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="text-gray-700">{benefit}</span>
-                  <button className="p-1 text-gray-400 hover:text-red-600">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
+            {company.benefits.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">
+                No benefits added yet. Add benefits to attract top talent.
+              </p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3">
+                {company.benefits.map((benefit, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-gray-700">{benefit}</span>
+                    <button
+                      onClick={() => removeBenefit(benefit)}
+                      className="p-1 text-gray-400 hover:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Office Locations */}
           <div className="bg-white rounded-xl border p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-semibold text-gray-900">Office Locations</h3>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Location
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Add a location"
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addLocation()}
+                  className="w-40"
+                />
+                <Button variant="outline" size="sm" onClick={addLocation}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <div className="space-y-3">
-              {company.locations.map((location, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-700">{location}</span>
-                    {index === 0 && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        Headquarters
-                      </span>
-                    )}
+            {company.locations.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">
+                No locations added yet. Add your office locations.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {company.locations.map((location, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-5 h-5 text-gray-400" />
+                      <span className="text-gray-700">{location}</span>
+                      {index === 0 && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          Headquarters
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeLocation(location)}
+                      className="p-1 text-gray-400 hover:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button className="p-1 text-gray-400 hover:text-red-600">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -313,21 +492,23 @@ export default function CompanyProfilePage() {
                   <Users className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-600">Employees</span>
                 </div>
-                <span className="font-medium text-gray-900">{company.stats.employees}</span>
+                <span className="font-medium text-gray-900">
+                  {company.size || "Not set"}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Building2 className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-600">Offices</span>
                 </div>
-                <span className="font-medium text-gray-900">{company.stats.offices}</span>
+                <span className="font-medium text-gray-900">{company.locations.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">Avg. Tenure</span>
+                  <span className="text-gray-600">Founded</span>
                 </div>
-                <span className="font-medium text-gray-900">{company.stats.avgTenure}</span>
+                <span className="font-medium text-gray-900">{company.founded || "Not set"}</span>
               </div>
             </div>
           </div>
@@ -344,6 +525,12 @@ export default function CompanyProfilePage() {
                   <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     value={company.socialLinks.linkedin}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        socialLinks: { ...company.socialLinks, linkedin: e.target.value },
+                      })
+                    }
                     className="pl-10"
                     placeholder="https://linkedin.com/company/..."
                   />
@@ -357,6 +544,12 @@ export default function CompanyProfilePage() {
                   <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     value={company.socialLinks.twitter}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        socialLinks: { ...company.socialLinks, twitter: e.target.value },
+                      })
+                    }
                     className="pl-10"
                     placeholder="https://twitter.com/..."
                   />
@@ -370,6 +563,12 @@ export default function CompanyProfilePage() {
                   <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     value={company.socialLinks.instagram}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        socialLinks: { ...company.socialLinks, instagram: e.target.value },
+                      })
+                    }
                     className="pl-10"
                     placeholder="https://instagram.com/..."
                   />
