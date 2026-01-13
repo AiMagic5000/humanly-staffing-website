@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   Clock,
@@ -7,7 +8,8 @@ import {
   Users,
   Award,
   Target,
-  HeartHandshake
+  HeartHandshake,
+  CheckCircle2,
 } from "lucide-react";
 import { siteConfig } from "@/lib/config";
 
@@ -65,6 +67,23 @@ export function WhyChooseUs() {
               in building high-performing teams that drive business success.
             </p>
 
+            {/* Key Benefits List */}
+            <div className="mt-8 space-y-4">
+              {[
+                "Access to 50,000+ pre-vetted candidates",
+                "Average 14-day time to fill positions",
+                "90-day replacement guarantee",
+                "Dedicated account manager support",
+              ].map((benefit, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <span className="text-gray-700">{benefit}</span>
+                </div>
+              ))}
+            </div>
+
             {/* Stats */}
             <div className="mt-10 grid grid-cols-2 gap-6">
               <div className="rounded-xl bg-blue-50 p-6">
@@ -84,6 +103,28 @@ export function WhyChooseUs() {
                 <p className="mt-1 text-sm text-gray-600">Years Experience</p>
               </div>
             </div>
+
+            {/* Professional Image */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mt-10 relative rounded-2xl overflow-hidden"
+            >
+              <Image
+                src="https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Team collaboration and success"
+                width={600}
+                height={300}
+                className="w-full h-48 object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <p className="font-semibold">Building Dream Teams Since 2010</p>
+                <p className="text-sm text-blue-100">Trusted by Fortune 500 companies worldwide</p>
+              </div>
+            </motion.div>
           </motion.div>
 
           {/* Right Content - Features */}
