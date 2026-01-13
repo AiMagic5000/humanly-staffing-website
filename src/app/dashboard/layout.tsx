@@ -8,7 +8,6 @@ import {
   Bookmark,
   User,
   Settings,
-  Bell,
   Briefcase,
   Building2,
   Users,
@@ -19,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { UserSection, SafeUserButton } from "@/components/auth/user-section";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 const candidateNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -124,10 +124,7 @@ export default function DashboardLayout({
             <div className="flex-1 lg:hidden" />
 
             <div className="flex items-center gap-4">
-              <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
+              <NotificationDropdown />
               <div className="lg:hidden">
                 <SafeUserButton afterSignOutUrl="/" />
               </div>

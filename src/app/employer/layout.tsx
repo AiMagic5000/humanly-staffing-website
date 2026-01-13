@@ -11,7 +11,6 @@ import {
   X,
   Building2,
   Plus,
-  Bell,
   ChevronDown,
   BarChart3,
   Search,
@@ -20,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserSection } from "@/components/auth/user-section";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 const navigation = [
   { name: "Dashboard", href: "/employer/dashboard", icon: LayoutDashboard },
@@ -142,10 +142,7 @@ export default function EmployerLayout({
           <div className="flex-1 lg:flex-none" />
 
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-lg hover:bg-gray-100">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <NotificationDropdown />
             <Button variant="outline" size="sm" asChild>
               <Link href="/employer/jobs/new">
                 <Plus className="w-4 h-4 mr-2" />
