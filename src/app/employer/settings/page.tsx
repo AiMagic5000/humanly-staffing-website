@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   Bell,
@@ -9,10 +9,11 @@ import {
   Shield,
   Users,
   Save,
-  Check,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 const settingsTabs = [
   { id: "general", label: "General", icon: Settings },
@@ -22,21 +23,131 @@ const settingsTabs = [
   { id: "security", label: "Security", icon: Shield },
 ];
 
-const teamMembers = [
-  { name: "John Smith", email: "john@techcorp.com", role: "Admin", status: "Active" },
-  { name: "Emily Chen", email: "emily@techcorp.com", role: "Recruiter", status: "Active" },
-  { name: "Michael Brown", email: "michael@techcorp.com", role: "Hiring Manager", status: "Active" },
-  { name: "Sarah Davis", email: "sarah@techcorp.com", role: "Recruiter", status: "Pending" },
-];
+interface NotificationSettings {
+  newApplications: boolean;
+  applicationStatusChanges: boolean;
+  jobExpirationReminders: boolean;
+  weeklySummaryReports: boolean;
+  platformUpdates: boolean;
+}
+
+interface EmployerSettings {
+  language: string;
+  timezone: string;
+  dateFormat: string;
+  defaultJobDuration: number;
+  notifications: NotificationSettings;
+  twoFactorEnabled: boolean;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: "Active" | "Pending";
+}
 
 export default function EmployerSettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
-  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const [settings, setSettings] = useState<EmployerSettings>({
+    language: "en",
+    timezone: "America/Los_Angeles",
+    dateFormat: "mdy",
+    defaultJobDuration: 30,
+    notifications: {
+      newApplications: true,
+      applicationStatusChanges: true,
+      jobExpirationReminders: true,
+      weeklySummaryReports: false,
+      platformUpdates: false,
+    },
+    twoFactorEnabled: false,
+  });
+
+  const [teamMembers] = useState<TeamMember[]>([
+    { id: "1", name: "John Smith", email: "john@techcorp.com", role: "Admin", status: "Active" },
+    { id: "2", name: "Emily Chen", email: "emily@techcorp.com", role: "Recruiter", status: "Active" },
+    { id: "3", name: "Michael Brown", email: "michael@techcorp.com", role: "Hiring Manager", status: "Active" },
+    { id: "4", name: "Sarah Davis", email: "sarah@techcorp.com", role: "Recruiter", status: "Pending" },
+  ]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch("/api/settings");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSettings({
+          language: result.data.language || "en",
+          timezone: result.data.timezone || "America/Los_Angeles",
+          dateFormat: result.data.dateFormat || "mdy",
+          defaultJobDuration: result.data.defaultJobDuration || 30,
+          notifications: {
+            newApplications: result.data.notifications?.newApplications ?? true,
+            applicationStatusChanges: result.data.notifications?.applicationStatusChanges ?? true,
+            jobExpirationReminders: result.data.notifications?.jobExpirationReminders ?? true,
+            weeklySummaryReports: result.data.notifications?.weeklySummaryReports ?? false,
+            platformUpdates: result.data.notifications?.platformUpdates ?? false,
+          },
+          twoFactorEnabled: result.data.twoFactorEnabled || false,
+        });
+      }
+    } catch (error) {
+      console.error("Fetch settings error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save settings");
+      }
+
+      toast.success("Settings saved successfully!");
+    } catch (error) {
+      console.error("Save settings error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateNotification = (key: keyof NotificationSettings, value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        [key]: value,
+      },
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -46,11 +157,11 @@ export default function EmployerSettingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
           <p className="text-gray-600 mt-1">Manage your company account preferences</p>
         </div>
-        <Button onClick={handleSave} className="gap-2">
-          {saved ? (
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? (
             <>
-              <Check className="w-4 h-4" />
-              Saved
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
             </>
           ) : (
             <>
@@ -117,8 +228,14 @@ export default function EmployerSettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Timezone
                     </label>
-                    <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select
+                      value={settings.timezone}
+                      onChange={(e) => setSettings(prev => ({ ...prev, timezone: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
                       <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                      <option value="America/Denver">Mountain Time (MT)</option>
+                      <option value="America/Chicago">Central Time (CT)</option>
                       <option value="America/New_York">Eastern Time (ET)</option>
                       <option value="UTC">UTC</option>
                     </select>
@@ -127,7 +244,11 @@ export default function EmployerSettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Language
                     </label>
-                    <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select
+                      value={settings.language}
+                      onChange={(e) => setSettings(prev => ({ ...prev, language: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
                       <option value="en">English</option>
                       <option value="es">Spanish</option>
                       <option value="fr">French</option>
@@ -137,7 +258,11 @@ export default function EmployerSettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Date Format
                     </label>
-                    <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select
+                      value={settings.dateFormat}
+                      onChange={(e) => setSettings(prev => ({ ...prev, dateFormat: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
                       <option value="mdy">MM/DD/YYYY</option>
                       <option value="dmy">DD/MM/YYYY</option>
                       <option value="ymd">YYYY-MM-DD</option>
@@ -147,10 +272,14 @@ export default function EmployerSettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Default Job Duration
                     </label>
-                    <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="30">30 days</option>
-                      <option value="60">60 days</option>
-                      <option value="90">90 days</option>
+                    <select
+                      value={settings.defaultJobDuration}
+                      onChange={(e) => setSettings(prev => ({ ...prev, defaultJobDuration: Number(e.target.value) }))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={30}>30 days</option>
+                      <option value={60}>60 days</option>
+                      <option value={90}>90 days</option>
                     </select>
                   </div>
                 </div>
@@ -164,19 +293,24 @@ export default function EmployerSettingsPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Notifications</h3>
                 <div className="space-y-4">
                   {[
-                    { label: "New applications", description: "Get notified when candidates apply to your jobs", checked: true },
-                    { label: "Application status changes", description: "When candidate status is updated", checked: true },
-                    { label: "Job expiration reminders", description: "Remind before jobs expire", checked: true },
-                    { label: "Weekly summary reports", description: "Receive weekly hiring activity summary", checked: false },
-                    { label: "Platform updates", description: "News and feature updates from Humanly Staffing", checked: false },
+                    { key: "newApplications" as const, label: "New applications", description: "Get notified when candidates apply to your jobs" },
+                    { key: "applicationStatusChanges" as const, label: "Application status changes", description: "When candidate status is updated" },
+                    { key: "jobExpirationReminders" as const, label: "Job expiration reminders", description: "Remind before jobs expire" },
+                    { key: "weeklySummaryReports" as const, label: "Weekly summary reports", description: "Receive weekly hiring activity summary" },
+                    { key: "platformUpdates" as const, label: "Platform updates", description: "News and feature updates from Humanly Staffing" },
                   ].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between p-4 rounded-lg border">
+                    <div key={item.key} className="flex items-center justify-between p-4 rounded-lg border">
                       <div>
                         <p className="font-medium text-gray-900">{item.label}</p>
                         <p className="text-sm text-gray-600">{item.description}</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" defaultChecked={item.checked} className="sr-only peer" />
+                        <input
+                          type="checkbox"
+                          checked={settings.notifications[item.key]}
+                          onChange={(e) => updateNotification(item.key, e.target.checked)}
+                          className="sr-only peer"
+                        />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
                     </div>
@@ -236,7 +370,7 @@ export default function EmployerSettingsPage() {
                   </thead>
                   <tbody className="divide-y">
                     {teamMembers.map((member) => (
-                      <tr key={member.email} className="hover:bg-gray-50">
+                      <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-4 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{member.name}</p>
@@ -360,7 +494,12 @@ export default function EmployerSettingsPage() {
                       <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
                     </div>
                   </div>
-                  <Button variant="outline">Enable</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSettings(prev => ({ ...prev, twoFactorEnabled: !prev.twoFactorEnabled }))}
+                  >
+                    {settings.twoFactorEnabled ? "Disable" : "Enable"}
+                  </Button>
                 </div>
               </div>
 
