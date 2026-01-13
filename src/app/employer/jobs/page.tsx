@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -17,88 +17,37 @@ import {
   Copy,
   Pause,
   Play,
+  Loader2,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Mock jobs data
-const jobs = [
-  {
-    id: "1",
-    title: "Senior Software Engineer",
-    department: "Engineering",
-    location: "San Francisco, CA",
-    type: "Full-time",
-    salary: "$150k - $200k",
-    applications: 45,
-    newApplications: 8,
-    views: 892,
-    postedAt: "2025-01-05",
-    expiresAt: "2025-02-05",
-    status: "active",
-    description: "We are looking for a Senior Software Engineer to join our team...",
-  },
-  {
-    id: "2",
-    title: "Product Manager",
-    department: "Product",
-    location: "Remote",
-    type: "Full-time",
-    salary: "$130k - $170k",
-    applications: 38,
-    newApplications: 5,
-    views: 654,
-    postedAt: "2025-01-08",
-    expiresAt: "2025-02-08",
-    status: "active",
-    description: "Seeking an experienced Product Manager to lead product strategy...",
-  },
-  {
-    id: "3",
-    title: "UX Designer",
-    department: "Design",
-    location: "New York, NY",
-    type: "Full-time",
-    salary: "$100k - $140k",
-    applications: 29,
-    newApplications: 3,
-    views: 521,
-    postedAt: "2025-01-10",
-    expiresAt: "2025-02-10",
-    status: "active",
-    description: "Looking for a creative UX Designer to improve our product experience...",
-  },
-  {
-    id: "4",
-    title: "DevOps Engineer",
-    department: "Engineering",
-    location: "Austin, TX",
-    type: "Full-time",
-    salary: "$120k - $160k",
-    applications: 22,
-    newApplications: 0,
-    views: 389,
-    postedAt: "2024-12-15",
-    expiresAt: "2025-01-15",
-    status: "paused",
-    description: "Seeking a DevOps Engineer to optimize our CI/CD pipelines...",
-  },
-  {
-    id: "5",
-    title: "Marketing Manager",
-    department: "Marketing",
-    location: "Remote",
-    type: "Full-time",
-    salary: "$90k - $120k",
-    applications: 56,
-    newApplications: 0,
-    views: 743,
-    postedAt: "2024-12-01",
-    expiresAt: "2025-01-01",
-    status: "closed",
-    description: "Looking for a Marketing Manager to lead our growth initiatives...",
-  },
-];
+interface Job {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  type: string;
+  salary: string;
+  applications: number;
+  newApplications: number;
+  views: number;
+  postedAt: string;
+  expiresAt: string;
+  status: string;
+  description: string;
+}
+
+interface JobStats {
+  total: number;
+  active: number;
+  paused: number;
+  closed: number;
+  draft: number;
+}
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
   active: { label: "Active", bg: "bg-emerald-100", text: "text-emerald-700" },
@@ -108,9 +57,122 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
 };
 
 export default function EmployerJobsPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [stats, setStats] = useState<JobStats>({ total: 0, active: 0, paused: 0, closed: 0, draft: 0 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/employer/jobs");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setJobs(result.data.jobs);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Jobs refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch jobs");
+      }
+    } catch (error) {
+      console.error("Fetch jobs error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh jobs");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleStatusChange = async (jobId: string, newStatus: string) => {
+    setActionLoading(jobId);
+    setOpenDropdown(null);
+
+    try {
+      const response = await fetch("/api/employer/jobs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        // Update local state
+        setJobs((prev) =>
+          prev.map((job) => (job.id === jobId ? { ...job, status: newStatus } : job))
+        );
+        // Update stats
+        setStats((prev) => {
+          const oldJob = jobs.find((j) => j.id === jobId);
+          if (!oldJob) return prev;
+          const newStats = { ...prev };
+          newStats[oldJob.status as keyof JobStats]--;
+          newStats[newStatus as keyof JobStats]++;
+          return newStats;
+        });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Status change error:", error);
+      toast.error("Failed to update job status");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (jobId: string) => {
+    if (!confirm("Are you sure you want to delete this job? This action cannot be undone.")) {
+      return;
+    }
+
+    setActionLoading(jobId);
+    setOpenDropdown(null);
+
+    try {
+      const response = await fetch(`/api/employer/jobs?jobId=${jobId}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Job deleted successfully");
+        // Remove from local state
+        const deletedJob = jobs.find((j) => j.id === jobId);
+        setJobs((prev) => prev.filter((job) => job.id !== jobId));
+        if (deletedJob) {
+          setStats((prev) => ({
+            ...prev,
+            total: prev.total - 1,
+            [deletedJob.status as keyof JobStats]: prev[deletedJob.status as keyof JobStats] - 1,
+          }));
+        }
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete job");
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
@@ -120,12 +182,13 @@ export default function EmployerJobsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const stats = {
-    total: jobs.length,
-    active: jobs.filter((j) => j.status === "active").length,
-    paused: jobs.filter((j) => j.status === "paused").length,
-    closed: jobs.filter((j) => j.status === "closed").length,
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -137,12 +200,24 @@ export default function EmployerJobsPage() {
             Manage your job listings and track applications
           </p>
         </div>
-        <Button asChild>
-          <Link href="/employer/jobs/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Post New Job
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchJobs(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/employer/jobs/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Post New Job
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -195,6 +270,14 @@ export default function EmployerJobsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+            >
+              <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          )}
         </div>
         <Button variant="outline" className="gap-2">
           <Filter className="w-4 h-4" />
@@ -235,10 +318,10 @@ export default function EmployerJobsPage() {
                         </Link>
                         <span
                           className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                            statusConfig[job.status].bg
-                          } ${statusConfig[job.status].text}`}
+                            statusConfig[job.status]?.bg || "bg-gray-100"
+                          } ${statusConfig[job.status]?.text || "text-gray-700"}`}
                         >
-                          {statusConfig[job.status].label}
+                          {statusConfig[job.status]?.label || job.status}
                         </span>
                         {job.newApplications > 0 && (
                           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-700">
@@ -289,8 +372,13 @@ export default function EmployerJobsPage() {
                     <button
                       onClick={() => setOpenDropdown(openDropdown === job.id ? null : job.id)}
                       className="p-2 rounded-lg hover:bg-gray-100"
+                      disabled={actionLoading === job.id}
                     >
-                      <MoreHorizontal className="w-5 h-5 text-gray-400" />
+                      {actionLoading === job.id ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                      ) : (
+                        <MoreHorizontal className="w-5 h-5 text-gray-400" />
+                      )}
                     </button>
 
                     {openDropdown === job.id && (
@@ -312,18 +400,36 @@ export default function EmployerJobsPage() {
                             Duplicate
                           </button>
                           {job.status === "active" ? (
-                            <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <button
+                              onClick={() => handleStatusChange(job.id, "paused")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
                               <Pause className="w-4 h-4" />
                               Pause Job
                             </button>
                           ) : job.status === "paused" ? (
-                            <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <button
+                              onClick={() => handleStatusChange(job.id, "active")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
                               <Play className="w-4 h-4" />
                               Reactivate
                             </button>
                           ) : null}
+                          {job.status !== "closed" && (
+                            <button
+                              onClick={() => handleStatusChange(job.id, "closed")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <X className="w-4 h-4" />
+                              Close Job
+                            </button>
+                          )}
                           <hr className="my-1" />
-                          <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                          <button
+                            onClick={() => handleDelete(job.id)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
                             <Trash2 className="w-4 h-4" />
                             Delete
                           </button>

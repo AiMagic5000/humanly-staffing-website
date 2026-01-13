@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -15,10 +15,13 @@ import {
   Search,
   DollarSign,
   TrendingUp,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
@@ -31,89 +34,16 @@ interface Notification {
   link?: string;
 }
 
-// Mock notifications for employers
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "application",
-    title: "New Application Received",
-    description: "John Smith applied for Senior Software Engineer position.",
-    time: "10:30 AM",
-    date: "Today",
-    read: false,
-    link: "/employer/applications",
-  },
-  {
-    id: "2",
-    type: "application",
-    title: "Application Update",
-    description: "Sarah Johnson accepted your interview invitation for Product Manager.",
-    time: "9:15 AM",
-    date: "Today",
-    read: false,
-    link: "/employer/applications",
-  },
-  {
-    id: "3",
-    type: "interview",
-    title: "Interview Scheduled",
-    description: "Interview with Michael Chen for DevOps Engineer is confirmed for tomorrow at 2:00 PM.",
-    time: "8:00 AM",
-    date: "Today",
-    read: true,
-    link: "/employer/applications",
-  },
-  {
-    id: "4",
-    type: "message",
-    title: "New Message",
-    description: "Emily Rodriguez sent you a message about the UX Designer position.",
-    time: "4:30 PM",
-    date: "Yesterday",
-    read: true,
-    link: "/employer/messages",
-  },
-  {
-    id: "5",
-    type: "job",
-    title: "Job Posting Expiring Soon",
-    description: "Your Senior Software Engineer posting will expire in 3 days. Renew to continue receiving applications.",
-    time: "2:15 PM",
-    date: "Yesterday",
-    read: true,
-    link: "/employer/jobs",
-  },
-  {
-    id: "6",
-    type: "analytics",
-    title: "Weekly Performance Report",
-    description: "Your job postings received 156 views and 23 applications this week.",
-    time: "11:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    link: "/employer/analytics",
-  },
-  {
-    id: "7",
-    type: "billing",
-    title: "Payment Successful",
-    description: "Your monthly subscription payment of $299 was processed successfully.",
-    time: "9:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    link: "/employer/settings",
-  },
-  {
-    id: "8",
-    type: "application",
-    title: "Candidate Withdrew",
-    description: "David Kim withdrew their application for Full Stack Developer position.",
-    time: "3:45 PM",
-    date: "Jan 10, 2025",
-    read: true,
-    link: "/employer/applications",
-  },
-];
+interface NotificationStats {
+  total: number;
+  unread: number;
+  application: number;
+  interview: number;
+  message: number;
+  job: number;
+  billing: number;
+  analytics: number;
+}
 
 const getNotificationIcon = (type: Notification["type"]) => {
   switch (type) {
@@ -156,11 +86,53 @@ const getNotificationColor = (type: Notification["type"]) => {
 type FilterType = "all" | "unread" | "application" | "interview" | "job" | "message" | "billing" | "analytics";
 
 export default function EmployerNotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [stats, setStats] = useState<NotificationStats>({
+    total: 0,
+    unread: 0,
+    application: 0,
+    interview: 0,
+    message: 0,
+    job: 0,
+    billing: 0,
+    analytics: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/employer/notifications");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setNotifications(result.data.notifications);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Notifications refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch notifications");
+      }
+    } catch (error) {
+      console.error("Fetch notifications error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh notifications");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const filteredNotifications = notifications.filter((n) => {
     const matchesFilter = filter === "all" || filter === "unread" ? true : n.type === filter;
@@ -181,23 +153,192 @@ export default function EmployerNotificationsPage() {
     return groups;
   }, {} as Record<string, Notification[]>);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    setActionLoading(id);
+
+    // Optimistic update
     setNotifications(
       notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    setStats((prev) => ({
+      ...prev,
+      unread: Math.max(0, prev.unread - 1),
+    }));
+
+    try {
+      const response = await fetch("/api/employer/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id, action: "markRead" }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        // Revert on error
+        setNotifications(
+          notifications.map((n) => (n.id === id ? { ...n, read: false } : n))
+        );
+        setStats((prev) => ({
+          ...prev,
+          unread: prev.unread + 1,
+        }));
+        toast.error("Failed to mark as read");
+      }
+    } catch (error) {
+      console.error("Mark as read error:", error);
+      // Revert on error
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, read: false } : n))
+      );
+      setStats((prev) => ({
+        ...prev,
+        unread: prev.unread + 1,
+      }));
+      toast.error("Failed to mark as read");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    setActionLoading("all");
+
+    // Store previous state for revert
+    const previousNotifications = [...notifications];
+    const previousStats = { ...stats };
+
+    // Optimistic update
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    setStats((prev) => ({ ...prev, unread: 0 }));
+
+    try {
+      const response = await fetch("/api/employer/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "markAllRead" }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("All notifications marked as read");
+      } else {
+        // Revert on error
+        setNotifications(previousNotifications);
+        setStats(previousStats);
+        toast.error("Failed to mark all as read");
+      }
+    } catch (error) {
+      console.error("Mark all as read error:", error);
+      setNotifications(previousNotifications);
+      setStats(previousStats);
+      toast.error("Failed to mark all as read");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const deleteNotification = (id: string) => {
+  const deleteNotification = async (id: string) => {
+    setActionLoading(id);
+
+    // Store for potential revert
+    const notification = notifications.find((n) => n.id === id);
+    const previousNotifications = [...notifications];
+    const previousStats = { ...stats };
+
+    // Optimistic update
     setNotifications(notifications.filter((n) => n.id !== id));
+    if (notification) {
+      setStats((prev) => ({
+        ...prev,
+        total: prev.total - 1,
+        unread: notification.read ? prev.unread : prev.unread - 1,
+        [notification.type]: (prev[notification.type as keyof NotificationStats] as number) - 1,
+      }));
+    }
+
+    try {
+      const response = await fetch("/api/employer/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id, action: "delete" }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("Notification deleted");
+      } else {
+        // Revert on error
+        setNotifications(previousNotifications);
+        setStats(previousStats);
+        toast.error("Failed to delete notification");
+      }
+    } catch (error) {
+      console.error("Delete notification error:", error);
+      setNotifications(previousNotifications);
+      setStats(previousStats);
+      toast.error("Failed to delete notification");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const deleteAllRead = () => {
+  const deleteAllRead = async () => {
+    setActionLoading("deleteRead");
+
+    // Store for potential revert
+    const previousNotifications = [...notifications];
+    const previousStats = { ...stats };
+    const readNotifications = notifications.filter((n) => n.read);
+
+    // Optimistic update
     setNotifications(notifications.filter((n) => !n.read));
+
+    // Recalculate stats
+    const remainingNotifications = notifications.filter((n) => !n.read);
+    setStats({
+      total: remainingNotifications.length,
+      unread: remainingNotifications.length,
+      application: remainingNotifications.filter((n) => n.type === "application").length,
+      interview: remainingNotifications.filter((n) => n.type === "interview").length,
+      message: remainingNotifications.filter((n) => n.type === "message").length,
+      job: remainingNotifications.filter((n) => n.type === "job").length,
+      billing: remainingNotifications.filter((n) => n.type === "billing").length,
+      analytics: remainingNotifications.filter((n) => n.type === "analytics").length,
+    });
+
+    try {
+      const response = await fetch("/api/employer/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteRead" }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`Deleted ${readNotifications.length} read notification${readNotifications.length !== 1 ? "s" : ""}`);
+      } else {
+        // Revert on error
+        setNotifications(previousNotifications);
+        setStats(previousStats);
+        toast.error("Failed to delete read notifications");
+      }
+    } catch (error) {
+      console.error("Delete read notifications error:", error);
+      setNotifications(previousNotifications);
+      setStats(previousStats);
+      toast.error("Failed to delete read notifications");
+    } finally {
+      setActionLoading(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -206,20 +347,50 @@ export default function EmployerNotificationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
           <p className="text-gray-600 mt-1">
-            {unreadCount > 0
-              ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
+            {stats.unread > 0
+              ? `You have ${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
               : "All caught up!"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead} className="gap-2">
-              <CheckCheck className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchNotifications(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          {stats.unread > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={markAllAsRead}
+              disabled={actionLoading === "all"}
+              className="gap-2"
+            >
+              {actionLoading === "all" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCheck className="w-4 h-4" />
+              )}
               Mark all read
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={deleteAllRead} className="gap-2 text-gray-600">
-            <Trash2 className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={deleteAllRead}
+            disabled={actionLoading === "deleteRead" || notifications.filter((n) => n.read).length === 0}
+            className="gap-2 text-gray-600"
+          >
+            {actionLoading === "deleteRead" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
             Clear read
           </Button>
         </div>
@@ -233,9 +404,7 @@ export default function EmployerNotificationsPage() {
               <FileText className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {notifications.filter((n) => n.type === "application").length}
-              </p>
+              <p className="text-2xl font-bold text-gray-900">{stats.application}</p>
               <p className="text-sm text-gray-500">Applications</p>
             </div>
           </div>
@@ -246,9 +415,7 @@ export default function EmployerNotificationsPage() {
               <Calendar className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {notifications.filter((n) => n.type === "interview").length}
-              </p>
+              <p className="text-2xl font-bold text-gray-900">{stats.interview}</p>
               <p className="text-sm text-gray-500">Interviews</p>
             </div>
           </div>
@@ -259,9 +426,7 @@ export default function EmployerNotificationsPage() {
               <MessageSquare className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {notifications.filter((n) => n.type === "message").length}
-              </p>
+              <p className="text-2xl font-bold text-gray-900">{stats.message}</p>
               <p className="text-sm text-gray-500">Messages</p>
             </div>
           </div>
@@ -272,7 +437,7 @@ export default function EmployerNotificationsPage() {
               <Bell className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{unreadCount}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.unread}</p>
               <p className="text-sm text-gray-500">Unread</p>
             </div>
           </div>
@@ -331,6 +496,7 @@ export default function EmployerNotificationsPage() {
                 {dateNotifications.map((notification) => {
                   const Icon = getNotificationIcon(notification.type);
                   const colorClass = getNotificationColor(notification.type);
+                  const isLoading = actionLoading === notification.id;
 
                   return (
                     <div
@@ -347,7 +513,7 @@ export default function EmployerNotificationsPage() {
                         {notification.link ? (
                           <Link
                             href={notification.link}
-                            onClick={() => markAsRead(notification.id)}
+                            onClick={() => !notification.read && markAsRead(notification.id)}
                             className="block"
                           >
                             <p className={cn(
@@ -379,18 +545,28 @@ export default function EmployerNotificationsPage() {
                         {!notification.read && (
                           <button
                             onClick={() => markAsRead(notification.id)}
-                            className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                            disabled={isLoading}
+                            className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                             title="Mark as read"
                           >
-                            <Check className="w-4 h-4" />
+                            {isLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
                           </button>
                         )}
                         <button
                           onClick={() => deleteNotification(notification.id)}
-                          className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-600"
+                          disabled={isLoading}
+                          className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-600 disabled:opacity-50"
                           title="Delete"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {isLoading && notification.read ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </div>

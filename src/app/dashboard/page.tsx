@@ -1,6 +1,9 @@
-import { Metadata } from "next";
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { currentUser } from "@clerk/nextjs/server";
+import dynamic from "next/dynamic";
+import { useUser } from "@clerk/nextjs";
 import {
   FileText,
   Bookmark,
@@ -9,92 +12,40 @@ import {
   Briefcase,
   Clock,
   ArrowRight,
-  Bell
+  Bell,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-// Force dynamic rendering for pages that use Clerk
-export const dynamic = "force-dynamic";
+interface DashboardStats {
+  applications: number;
+  savedJobs: number;
+  profileViews: number;
+  interviewInvites: number;
+}
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Manage your job applications and profile",
-};
+interface RecentApplication {
+  id: string;
+  jobTitle: string;
+  company: string;
+  location: string;
+  appliedDate: string;
+  status: string;
+}
 
-// Mock data - in production, this would come from the database
-const stats = [
-  { name: "Applications", value: 12, icon: FileText, change: "+3 this week", color: "blue" },
-  { name: "Saved Jobs", value: 8, icon: Bookmark, change: "+2 this week", color: "indigo" },
-  { name: "Profile Views", value: 47, icon: Eye, change: "+12% vs last week", color: "green" },
-  { name: "Interview Invites", value: 3, icon: TrendingUp, change: "+1 this week", color: "purple" },
-];
+interface RecommendedJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  type: string;
+  posted: string;
+}
 
-const recentApplications = [
-  {
-    id: "1",
-    jobTitle: "Senior Software Engineer",
-    company: "TechCorp Inc.",
-    location: "San Francisco, CA",
-    appliedDate: "2025-01-10",
-    status: "reviewing",
-  },
-  {
-    id: "2",
-    jobTitle: "Full Stack Developer",
-    company: "StartupXYZ",
-    location: "Remote",
-    appliedDate: "2025-01-08",
-    status: "interviewing",
-  },
-  {
-    id: "3",
-    jobTitle: "Frontend Developer",
-    company: "DesignHub",
-    location: "New York, NY",
-    appliedDate: "2025-01-05",
-    status: "pending",
-  },
-  {
-    id: "4",
-    jobTitle: "DevOps Engineer",
-    company: "CloudSystems",
-    location: "Seattle, WA",
-    appliedDate: "2025-01-03",
-    status: "rejected",
-  },
-];
-
-const recommendedJobs = [
-  {
-    id: "1",
-    title: "Senior React Developer",
-    company: "InnovateTech",
-    location: "Austin, TX",
-    salary: "$140,000 - $180,000",
-    type: "Full-time",
-    posted: "2 days ago",
-  },
-  {
-    id: "2",
-    title: "Lead Software Architect",
-    company: "Enterprise Solutions",
-    location: "Remote",
-    salary: "$160,000 - $200,000",
-    type: "Full-time",
-    posted: "1 day ago",
-  },
-  {
-    id: "3",
-    title: "Senior Backend Engineer",
-    company: "DataFlow Inc.",
-    location: "Denver, CO",
-    salary: "$130,000 - $160,000",
-    type: "Full-time",
-    posted: "3 days ago",
-  },
-];
-
-const statusColors = {
+const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   pending: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending" },
   reviewing: { bg: "bg-blue-100", text: "text-blue-800", label: "Under Review" },
   interviewing: { bg: "bg-purple-100", text: "text-purple-800", label: "Interviewing" },
@@ -103,8 +54,65 @@ const statusColors = {
   rejected: { bg: "bg-red-100", text: "text-red-800", label: "Not Selected" },
 };
 
-export default async function DashboardPage() {
-  const user = await currentUser();
+function DashboardContent() {
+  const { user, isLoaded: userLoaded } = useUser();
+  const [stats, setStats] = useState<DashboardStats>({
+    applications: 0,
+    savedJobs: 0,
+    profileViews: 0,
+    interviewInvites: 0,
+  });
+  const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
+  const [recommendedJobs, setRecommendedJobs] = useState<RecommendedJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/dashboard");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setStats(result.data.stats);
+        setRecentApplications(result.data.recentApplications);
+        setRecommendedJobs(result.data.recommendedJobs);
+        if (showToast) {
+          toast.success("Dashboard refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch dashboard data");
+      }
+    } catch (error) {
+      console.error("Fetch dashboard error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh dashboard");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const statsConfig = [
+    { name: "Applications", value: stats.applications, icon: FileText, change: "+3 this week", color: "blue" },
+    { name: "Saved Jobs", value: stats.savedJobs, icon: Bookmark, change: "+2 this week", color: "indigo" },
+    { name: "Profile Views", value: stats.profileViews, icon: Eye, change: "+12% vs last week", color: "green" },
+    { name: "Interview Invites", value: stats.interviewInvites, icon: TrendingUp, change: "+1 this week", color: "purple" },
+  ];
+
+  if (loading || !userLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -118,24 +126,46 @@ export default async function DashboardPage() {
             Here&apos;s what&apos;s happening with your job search
           </p>
         </div>
-        <Button asChild>
-          <Link href="/jobs" className="flex items-center gap-2">
-            <Briefcase className="w-4 h-4" />
-            Browse Jobs
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/jobs" className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4" />
+              Browse Jobs
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {statsConfig.map((stat) => (
           <div
             key={stat.name}
             className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
           >
             <div className="flex items-center justify-between">
-              <div className={`p-3 rounded-xl bg-${stat.color}-100`}>
-                <stat.icon className={`w-6 h-6 text-${stat.color}-600`} />
+              <div className={`p-3 rounded-xl ${
+                stat.color === "blue" ? "bg-blue-100" :
+                stat.color === "indigo" ? "bg-indigo-100" :
+                stat.color === "green" ? "bg-green-100" :
+                "bg-purple-100"
+              }`}>
+                <stat.icon className={`w-6 h-6 ${
+                  stat.color === "blue" ? "text-blue-600" :
+                  stat.color === "indigo" ? "text-indigo-600" :
+                  stat.color === "green" ? "text-green-600" :
+                  "text-purple-600"
+                }`} />
               </div>
               <span className="text-xs text-green-600 font-medium">{stat.change}</span>
             </div>
@@ -159,32 +189,38 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-gray-100">
-            {recentApplications.map((application) => {
-              const status = statusColors[application.status as keyof typeof statusColors];
-              return (
-                <div key={application.id} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">
-                        {application.jobTitle}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {application.company} • {application.location}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Clock className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="text-xs text-gray-500">
-                          Applied {new Date(application.appliedDate).toLocaleDateString()}
-                        </span>
+            {recentApplications.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                No applications yet. Start browsing jobs!
+              </div>
+            ) : (
+              recentApplications.map((application) => {
+                const status = statusColors[application.status] || statusColors.pending;
+                return (
+                  <div key={application.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">
+                          {application.jobTitle}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {application.company} • {application.location}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="text-xs text-gray-500">
+                            Applied {application.appliedDate}
+                          </span>
+                        </div>
                       </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
+                        {status.label}
+                      </span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
-                      {status.label}
-                    </span>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -201,29 +237,35 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-gray-100">
-            {recommendedJobs.map((job) => (
-              <Link
-                key={job.id}
-                href={`/jobs/${job.id}`}
-                className="block p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">{job.title}</h3>
-                    <p className="text-sm text-gray-600">
-                      {job.company} • {job.location}
-                    </p>
-                    <p className="text-sm text-green-600 font-medium mt-1">{job.salary}</p>
+            {recommendedJobs.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                No recommendations yet. Complete your profile to get personalized suggestions.
+              </div>
+            ) : (
+              recommendedJobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href={`/jobs/${job.id}`}
+                  className="block p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate">{job.title}</h3>
+                      <p className="text-sm text-gray-600">
+                        {job.company} • {job.location}
+                      </p>
+                      <p className="text-sm text-green-600 font-medium mt-1">{job.salary}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                        {job.type}
+                      </span>
+                      <p className="text-xs text-gray-500 mt-1">{job.posted}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
-                      {job.type}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">{job.posted}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -251,3 +293,15 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
+// Use dynamic import with SSR disabled to prevent prerendering issues with Clerk
+const DashboardPage = dynamic(() => Promise.resolve(DashboardContent), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+    </div>
+  ),
+});
+
+export default DashboardPage;

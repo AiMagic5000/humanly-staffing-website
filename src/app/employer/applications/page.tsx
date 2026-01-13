@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,134 +18,52 @@ import {
   MessageSquare,
   Star,
   ExternalLink,
+  Loader2,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Mock applications data
-const applications = [
-  {
-    id: "1",
-    candidate: {
-      name: "Sarah Johnson",
-      email: "sarah.johnson@email.com",
-      phone: "(555) 123-4567",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-      location: "San Francisco, CA",
-      currentTitle: "Senior Software Engineer",
-      experience: "8 years",
-      linkedin: "https://linkedin.com/in/sarahjohnson",
-      portfolio: "https://sarahjohnson.dev",
-    },
-    job: {
-      id: "1",
-      title: "Senior Software Engineer",
-      department: "Engineering",
-    },
-    appliedAt: "2025-01-13T10:30:00Z",
-    status: "new",
-    rating: 0,
-    notes: "",
-    coverLetter: "I am excited to apply for the Senior Software Engineer position at your company...",
-    resumeUrl: "/resumes/sarah-johnson.pdf",
-  },
-  {
-    id: "2",
-    candidate: {
-      name: "Michael Chen",
-      email: "michael.chen@email.com",
-      phone: "(555) 234-5678",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-      location: "New York, NY",
-      currentTitle: "Product Manager",
-      experience: "6 years",
-      linkedin: "https://linkedin.com/in/michaelchen",
-    },
-    job: {
-      id: "2",
-      title: "Product Manager",
-      department: "Product",
-    },
-    appliedAt: "2025-01-13T08:15:00Z",
-    status: "reviewing",
-    rating: 4,
-    notes: "Strong background in B2B SaaS. Schedule a call.",
-    coverLetter: "With 6 years of experience in product management...",
-    resumeUrl: "/resumes/michael-chen.pdf",
-  },
-  {
-    id: "3",
-    candidate: {
-      name: "Emily Rodriguez",
-      email: "emily.rodriguez@email.com",
-      phone: "(555) 345-6789",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-      location: "Austin, TX",
-      currentTitle: "UX Designer",
-      experience: "5 years",
-      linkedin: "https://linkedin.com/in/emilyrodriguez",
-      portfolio: "https://emilyrodriguez.design",
-    },
-    job: {
-      id: "3",
-      title: "UX Designer",
-      department: "Design",
-    },
-    appliedAt: "2025-01-12T14:45:00Z",
-    status: "shortlisted",
-    rating: 5,
-    notes: "Excellent portfolio. Moving to final interview round.",
-    coverLetter: "As a UX designer with a passion for user-centered design...",
-    resumeUrl: "/resumes/emily-rodriguez.pdf",
-  },
-  {
-    id: "4",
-    candidate: {
-      name: "David Kim",
-      email: "david.kim@email.com",
-      phone: "(555) 456-7890",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-      location: "Seattle, WA",
-      currentTitle: "Staff Engineer",
-      experience: "10 years",
-      linkedin: "https://linkedin.com/in/davidkim",
-    },
-    job: {
-      id: "1",
-      title: "Senior Software Engineer",
-      department: "Engineering",
-    },
-    appliedAt: "2025-01-12T09:20:00Z",
-    status: "interviewed",
-    rating: 4,
-    notes: "Technical interview completed. Strong systems design skills.",
-    coverLetter: "I bring 10 years of experience in building scalable systems...",
-    resumeUrl: "/resumes/david-kim.pdf",
-  },
-  {
-    id: "5",
-    candidate: {
-      name: "Jennifer Lee",
-      email: "jennifer.lee@email.com",
-      phone: "(555) 567-8901",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-      location: "Los Angeles, CA",
-      currentTitle: "Marketing Coordinator",
-      experience: "3 years",
-    },
-    job: {
-      id: "2",
-      title: "Product Manager",
-      department: "Product",
-    },
-    appliedAt: "2025-01-11T16:00:00Z",
-    status: "rejected",
-    rating: 2,
-    notes: "Does not meet minimum experience requirements.",
-    coverLetter: "I am eager to transition into product management...",
-    resumeUrl: "/resumes/jennifer-lee.pdf",
-  },
-];
+interface Candidate {
+  name: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  location: string;
+  currentTitle: string;
+  experience: string;
+  linkedin?: string;
+  portfolio?: string;
+}
+
+interface Application {
+  id: string;
+  candidate: Candidate;
+  job: {
+    id: string;
+    title: string;
+    department: string;
+  };
+  appliedAt: string;
+  status: string;
+  rating: number;
+  notes: string;
+  coverLetter: string;
+  resumeUrl: string;
+}
+
+interface ApplicationStats {
+  total: number;
+  new: number;
+  reviewing: number;
+  shortlisted: number;
+  interviewed: number;
+  offered: number;
+  hired: number;
+  rejected: number;
+}
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; icon: React.ElementType }> = {
   new: { label: "New", bg: "bg-blue-100", text: "text-blue-700", icon: Clock },
@@ -156,10 +75,116 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; ic
   hired: { label: "Hired", bg: "bg-green-100", text: "text-green-700", icon: CheckCircle },
 };
 
-export default function EmployerApplicationsPage() {
+function ApplicationsContent() {
+  const searchParams = useSearchParams();
+  const jobIdParam = searchParams.get("job");
+
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [stats, setStats] = useState<ApplicationStats>({
+    total: 0, new: 0, reviewing: 0, shortlisted: 0, interviewed: 0, offered: 0, hired: 0, rejected: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedApplication, setSelectedApplication] = useState<typeof applications[0] | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string>("");
+  const [pendingRating, setPendingRating] = useState<number>(0);
+  const [pendingNotes, setPendingNotes] = useState<string>("");
+
+  useEffect(() => {
+    fetchApplications();
+  }, [jobIdParam]);
+
+  useEffect(() => {
+    if (selectedApplication) {
+      setPendingStatus(selectedApplication.status);
+      setPendingRating(selectedApplication.rating);
+      setPendingNotes(selectedApplication.notes);
+    }
+  }, [selectedApplication]);
+
+  const fetchApplications = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const url = jobIdParam
+        ? `/api/employer/applications?jobId=${jobIdParam}`
+        : "/api/employer/applications";
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setApplications(result.data.applications);
+        setStats(result.data.stats);
+        if (showToast) {
+          toast.success("Applications refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch applications");
+      }
+    } catch (error) {
+      console.error("Fetch applications error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh applications");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleUpdateApplication = async () => {
+    if (!selectedApplication) return;
+
+    setUpdating(true);
+
+    try {
+      const response = await fetch("/api/employer/applications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: selectedApplication.id,
+          status: pendingStatus,
+          rating: pendingRating,
+          notes: pendingNotes,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Application updated");
+        // Update local state
+        setApplications((prev) =>
+          prev.map((app) =>
+            app.id === selectedApplication.id
+              ? { ...app, status: pendingStatus, rating: pendingRating, notes: pendingNotes }
+              : app
+          )
+        );
+        setSelectedApplication((prev) =>
+          prev ? { ...prev, status: pendingStatus, rating: pendingRating, notes: pendingNotes } : null
+        );
+        // Update stats if status changed
+        if (pendingStatus !== selectedApplication.status) {
+          setStats((prev) => ({
+            ...prev,
+            [selectedApplication.status]: prev[selectedApplication.status as keyof ApplicationStats] - 1,
+            [pendingStatus]: prev[pendingStatus as keyof ApplicationStats] + 1,
+          }));
+        }
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Update application error:", error);
+      toast.error("Failed to update application");
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const filteredApplications = applications.filter((app) => {
     const matchesSearch =
@@ -172,6 +197,8 @@ export default function EmployerApplicationsPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Unknown";
+
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 
@@ -180,6 +207,14 @@ export default function EmployerApplicationsPage() {
     if (diffInHours < 48) return "Yesterday";
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
@@ -190,8 +225,19 @@ export default function EmployerApplicationsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
             <p className="text-gray-600 mt-1">
               {filteredApplications.length} total applications
+              {jobIdParam && " for this job"}
             </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchApplications(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
 
         {/* Filters */}
@@ -204,20 +250,28 @@ export default function EmployerApplicationsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+              >
+                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">All Status</option>
-            <option value="new">New</option>
-            <option value="reviewing">Reviewing</option>
-            <option value="shortlisted">Shortlisted</option>
-            <option value="interviewed">Interviewed</option>
-            <option value="offered">Offered</option>
-            <option value="rejected">Rejected</option>
-            <option value="hired">Hired</option>
+            <option value="all">All Status ({stats.total})</option>
+            <option value="new">New ({stats.new})</option>
+            <option value="reviewing">Reviewing ({stats.reviewing})</option>
+            <option value="shortlisted">Shortlisted ({stats.shortlisted})</option>
+            <option value="interviewed">Interviewed ({stats.interviewed})</option>
+            <option value="offered">Offered ({stats.offered})</option>
+            <option value="hired">Hired ({stats.hired})</option>
+            <option value="rejected">Rejected ({stats.rejected})</option>
           </select>
         </div>
 
@@ -257,10 +311,10 @@ export default function EmployerApplicationsPage() {
                       <div className="flex flex-col items-end gap-1">
                         <span
                           className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            statusConfig[application.status].bg
-                          } ${statusConfig[application.status].text}`}
+                            statusConfig[application.status]?.bg || "bg-gray-100"
+                          } ${statusConfig[application.status]?.text || "text-gray-700"}`}
                         >
-                          {statusConfig[application.status].label}
+                          {statusConfig[application.status]?.label || application.status}
                         </span>
                         <span className="text-xs text-gray-500">
                           {formatDate(application.appliedAt)}
@@ -304,9 +358,11 @@ export default function EmployerApplicationsPage() {
                 &larr; Back to list
               </button>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`mailto:${selectedApplication.candidate.email}`}>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email
+                  </a>
                 </Button>
                 <Button size="sm">Schedule Interview</Button>
               </div>
@@ -328,10 +384,10 @@ export default function EmployerApplicationsPage() {
                 <div className="flex items-center gap-2 mt-2">
                   <span
                     className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      statusConfig[selectedApplication.status].bg
-                    } ${statusConfig[selectedApplication.status].text}`}
+                      statusConfig[selectedApplication.status]?.bg || "bg-gray-100"
+                    } ${statusConfig[selectedApplication.status]?.text || "text-gray-700"}`}
                   >
-                    {statusConfig[selectedApplication.status].label}
+                    {statusConfig[selectedApplication.status]?.label || selectedApplication.status}
                   </span>
                   <span className="text-sm text-gray-500">
                     Applied {formatDate(selectedApplication.appliedAt)}
@@ -354,13 +410,15 @@ export default function EmployerApplicationsPage() {
                   <Mail className="w-4 h-4" />
                   {selectedApplication.candidate.email}
                 </a>
-                <a
-                  href={`tel:${selectedApplication.candidate.phone}`}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600"
-                >
-                  <Phone className="w-4 h-4" />
-                  {selectedApplication.candidate.phone}
-                </a>
+                {selectedApplication.candidate.phone && (
+                  <a
+                    href={`tel:${selectedApplication.candidate.phone}`}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600"
+                  >
+                    <Phone className="w-4 h-4" />
+                    {selectedApplication.candidate.phone}
+                  </a>
+                )}
                 <p className="flex items-center gap-2 text-sm text-gray-600">
                   <MapPin className="w-4 h-4" />
                   {selectedApplication.candidate.location}
@@ -394,10 +452,17 @@ export default function EmployerApplicationsPage() {
                     Portfolio
                   </a>
                 )}
-                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm text-gray-700 hover:bg-gray-200">
-                  <Download className="w-3.5 h-3.5" />
-                  Resume
-                </button>
+                {selectedApplication.resumeUrl && (
+                  <a
+                    href={selectedApplication.resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm text-gray-700 hover:bg-gray-200"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Resume
+                  </a>
+                )}
               </div>
             </div>
 
@@ -414,12 +479,14 @@ export default function EmployerApplicationsPage() {
             </div>
 
             {/* Cover Letter */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Cover Letter</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                {selectedApplication.coverLetter}
-              </p>
-            </div>
+            {selectedApplication.coverLetter && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Cover Letter</h3>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                  {selectedApplication.coverLetter}
+                </p>
+              </div>
+            )}
 
             {/* Rating */}
             <div>
@@ -428,11 +495,12 @@ export default function EmployerApplicationsPage() {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
+                    onClick={() => setPendingRating(star === pendingRating ? 0 : star)}
                     className="p-1 hover:scale-110 transition-transform"
                   >
                     <Star
                       className={`w-6 h-6 ${
-                        star <= selectedApplication.rating
+                        star <= pendingRating
                           ? "text-amber-500 fill-amber-500"
                           : "text-gray-300"
                       }`}
@@ -446,7 +514,8 @@ export default function EmployerApplicationsPage() {
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Internal Notes</h3>
               <textarea
-                defaultValue={selectedApplication.notes}
+                value={pendingNotes}
+                onChange={(e) => setPendingNotes(e.target.value)}
                 placeholder="Add notes about this candidate..."
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
@@ -458,7 +527,8 @@ export default function EmployerApplicationsPage() {
           <div className="p-4 border-t bg-gray-50">
             <div className="flex gap-2">
               <select
-                value={selectedApplication.status}
+                value={pendingStatus}
+                onChange={(e) => setPendingStatus(e.target.value)}
                 className="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="new">New</option>
@@ -469,11 +539,34 @@ export default function EmployerApplicationsPage() {
                 <option value="hired">Hired</option>
                 <option value="rejected">Rejected</option>
               </select>
-              <Button>Update Status</Button>
+              <Button
+                onClick={handleUpdateApplication}
+                disabled={updating}
+              >
+                {updating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Update"
+                )}
+              </Button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function EmployerApplicationsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      }
+    >
+      <ApplicationsContent />
+    </Suspense>
   );
 }

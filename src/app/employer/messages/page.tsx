@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Search,
@@ -15,10 +15,13 @@ import {
   Info,
   Filter,
   UserPlus,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -44,135 +47,50 @@ interface Conversation {
   messages: Message[];
 }
 
-// Mock conversations data for employer
-const mockConversations: Conversation[] = [
-  {
-    id: "1",
-    contact: {
-      name: "John Smith",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-      role: "Senior Software Engineer",
-      appliedFor: "Full Stack Developer",
-      online: true,
-    },
-    lastMessage: "Thank you for the opportunity! I'm available for the interview.",
-    timestamp: "10:30 AM",
-    unread: true,
-    starred: true,
-    status: "interviewing",
-    messages: [
-      {
-        id: "m1",
-        content: "Hi John! We've reviewed your application for the Full Stack Developer position and we're impressed with your experience.",
-        timestamp: "Yesterday 2:30 PM",
-        isOwn: true,
-      },
-      {
-        id: "m2",
-        content: "Thank you so much for reaching out! I'm very excited about this opportunity.",
-        timestamp: "Yesterday 3:15 PM",
-        isOwn: false,
-      },
-      {
-        id: "m3",
-        content: "Would you be available for a technical interview next Tuesday at 2 PM PST?",
-        timestamp: "Yesterday 4:00 PM",
-        isOwn: true,
-      },
-      {
-        id: "m4",
-        content: "Thank you for the opportunity! I'm available for the interview.",
-        timestamp: "Today 10:30 AM",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    contact: {
-      name: "Sarah Johnson",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-      role: "Product Manager",
-      appliedFor: "Senior Product Manager",
-      online: false,
-    },
-    lastMessage: "I have attached my portfolio for your review.",
-    timestamp: "Yesterday",
-    unread: false,
-    starred: false,
-    status: "active",
-    messages: [
-      {
-        id: "m1",
-        content: "Hello Sarah, thank you for applying to our Senior Product Manager position.",
-        timestamp: "2 days ago",
-        isOwn: true,
-      },
-      {
-        id: "m2",
-        content: "I have attached my portfolio for your review.",
-        timestamp: "Yesterday",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    contact: {
-      name: "Michael Chen",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-      role: "DevOps Engineer",
-      appliedFor: "Cloud Infrastructure Engineer",
-      online: true,
-    },
-    lastMessage: "Looking forward to hearing from you!",
-    timestamp: "Jan 10",
-    unread: false,
-    starred: true,
-    status: "active",
-    messages: [
-      {
-        id: "m1",
-        content: "Looking forward to hearing from you!",
-        timestamp: "Jan 10",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    contact: {
-      name: "Emily Rodriguez",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-      role: "UX Designer",
-      appliedFor: "Lead UX Designer",
-      online: false,
-    },
-    lastMessage: "Welcome aboard! We're excited to have you join the team.",
-    timestamp: "Jan 8",
-    unread: false,
-    starred: false,
-    status: "hired",
-    messages: [
-      {
-        id: "m1",
-        content: "Welcome aboard! We're excited to have you join the team.",
-        timestamp: "Jan 8",
-        isOwn: true,
-      },
-    ],
-  },
-];
-
 type FilterType = "all" | "unread" | "starred" | "interviewing" | "hired";
 
 export default function EmployerMessagesPage() {
-  const [conversations, setConversations] = useState(mockConversations);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newMessage, setNewMessage] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [showMobileConversation, setShowMobileConversation] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const fetchConversations = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/employer/messages");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setConversations(result.data.conversations);
+        setUnreadCount(result.data.unreadCount);
+        if (showToast) {
+          toast.success("Messages refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch messages");
+      }
+    } catch (error) {
+      console.error("Fetch messages error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh messages");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const filteredConversations = conversations.filter((conv) => {
     const matchesSearch =
@@ -189,9 +107,11 @@ export default function EmployerMessagesPage() {
     return matchesSearch && matchesFilter;
   });
 
-  const unreadCount = conversations.filter((c) => c.unread).length;
+  const toggleStar = async (id: string) => {
+    const conv = conversations.find((c) => c.id === id);
+    if (!conv) return;
 
-  const toggleStar = (id: string) => {
+    // Optimistic update
     setConversations(
       conversations.map((c) =>
         c.id === id ? { ...c, starred: !c.starred } : c
@@ -203,26 +123,60 @@ export default function EmployerMessagesPage() {
         starred: !selectedConversation.starred,
       });
     }
-  };
 
-  const selectConversation = (conv: Conversation) => {
-    setSelectedConversation(conv);
-    setShowMobileConversation(true);
-    if (conv.unread) {
+    try {
+      await fetch("/api/employer/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id, action: "toggleStar" }),
+      });
+    } catch (error) {
+      console.error("Toggle star error:", error);
+      // Revert on error
       setConversations(
         conversations.map((c) =>
-          c.id === conv.id ? { ...c, unread: false } : c
+          c.id === id ? { ...c, starred: conv.starred } : c
         )
       );
     }
   };
 
-  const sendMessage = () => {
+  const selectConversation = async (conv: Conversation) => {
+    setSelectedConversation(conv);
+    setShowMobileConversation(true);
+
+    if (conv.unread) {
+      // Optimistic update
+      setConversations(
+        conversations.map((c) =>
+          c.id === conv.id ? { ...c, unread: false } : c
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      try {
+        await fetch("/api/employer/messages", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: conv.id, action: "markRead" }),
+        });
+      } catch (error) {
+        console.error("Mark read error:", error);
+      }
+    }
+  };
+
+  const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
+    setSendingMessage(true);
+    const messageContent = newMessage;
+    setNewMessage("");
+
+    // Optimistic update
     const newMsg: Message = {
       id: `m${Date.now()}`,
-      content: newMessage,
+      content: messageContent,
       timestamp: "Just now",
       isOwn: true,
     };
@@ -230,7 +184,7 @@ export default function EmployerMessagesPage() {
     const updatedConversation = {
       ...selectedConversation,
       messages: [...selectedConversation.messages, newMsg],
-      lastMessage: newMessage,
+      lastMessage: messageContent,
       timestamp: "Just now",
     };
 
@@ -240,7 +194,36 @@ export default function EmployerMessagesPage() {
       )
     );
     setSelectedConversation(updatedConversation);
-    setNewMessage("");
+
+    try {
+      const response = await fetch("/api/employer/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: selectedConversation.id,
+          content: messageContent,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Send message error:", error);
+      toast.error("Failed to send message");
+      // Revert on error
+      setConversations(
+        conversations.map((c) =>
+          c.id === selectedConversation.id ? selectedConversation : c
+        )
+      );
+      setSelectedConversation(selectedConversation);
+      setNewMessage(messageContent);
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const getStatusBadge = (status: Conversation["status"]) => {
@@ -256,6 +239,14 @@ export default function EmployerMessagesPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Header */}
@@ -268,10 +259,22 @@ export default function EmployerMessagesPage() {
               : "All messages read"}
           </p>
         </div>
-        <Button className="gap-2">
-          <UserPlus className="w-4 h-4" />
-          Message Candidate
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchConversations(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button className="gap-2">
+            <UserPlus className="w-4 h-4" />
+            Message Candidate
+          </Button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -503,6 +506,7 @@ export default function EmployerMessagesPage() {
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
                     className="flex-1"
+                    disabled={sendingMessage}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -512,10 +516,14 @@ export default function EmployerMessagesPage() {
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={!newMessage.trim()}
+                    disabled={!newMessage.trim() || sendingMessage}
                     size="icon"
                   >
-                    <Send className="w-4 h-4" />
+                    {sendingMessage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>

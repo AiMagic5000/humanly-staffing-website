@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -14,14 +14,17 @@ import {
   Trash2,
   Filter,
   Search,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
-  type: "application" | "interview" | "job" | "message" | "system";
+  type: "application" | "interview" | "job" | "message" | "system" | "info" | "success" | "warning" | "error";
   title: string;
   description: string;
   time: string;
@@ -30,93 +33,10 @@ interface Notification {
   link?: string;
 }
 
-// Mock notifications - in production, fetch from database
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "application",
-    title: "Application Status Update",
-    description: "Your application for Senior Software Engineer at TechCorp has moved to the interview stage.",
-    time: "10:30 AM",
-    date: "Today",
-    read: false,
-    link: "/dashboard/applications",
-  },
-  {
-    id: "2",
-    type: "interview",
-    title: "Interview Scheduled",
-    description: "You have a video interview scheduled with TechCorp for tomorrow at 2:00 PM PST.",
-    time: "9:15 AM",
-    date: "Today",
-    read: false,
-    link: "/dashboard/applications",
-  },
-  {
-    id: "3",
-    type: "job",
-    title: "New Job Recommendation",
-    description: "Based on your profile, we found a new job that might interest you: Product Manager at StartupXYZ",
-    time: "8:00 AM",
-    date: "Today",
-    read: true,
-    link: "/jobs",
-  },
-  {
-    id: "4",
-    type: "message",
-    title: "Message from Recruiter",
-    description: "Sarah from TechCorp HR has sent you a message regarding your application.",
-    time: "4:30 PM",
-    date: "Yesterday",
-    read: true,
-    link: "/dashboard",
-  },
-  {
-    id: "5",
-    type: "application",
-    title: "Application Received",
-    description: "Your application for UX Designer at DesignCo has been received and is being reviewed.",
-    time: "2:15 PM",
-    date: "Yesterday",
-    read: true,
-    link: "/dashboard/applications",
-  },
-  {
-    id: "6",
-    type: "system",
-    title: "Complete Your Profile",
-    description: "Add your skills and experience to increase your visibility to employers.",
-    time: "11:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    link: "/dashboard/profile",
-  },
-  {
-    id: "7",
-    type: "job",
-    title: "Job Alert: 5 New Matches",
-    description: "5 new jobs matching your preferences have been posted in the last 24 hours.",
-    time: "9:00 AM",
-    date: "Jan 11, 2025",
-    read: true,
-    link: "/jobs",
-  },
-  {
-    id: "8",
-    type: "application",
-    title: "Application Viewed",
-    description: "A recruiter at CloudServices has viewed your application for DevOps Engineer.",
-    time: "3:45 PM",
-    date: "Jan 10, 2025",
-    read: true,
-    link: "/dashboard/applications",
-  },
-];
-
 const getNotificationIcon = (type: Notification["type"]) => {
   switch (type) {
     case "application":
+    case "success":
       return FileText;
     case "interview":
       return Calendar;
@@ -125,6 +45,8 @@ const getNotificationIcon = (type: Notification["type"]) => {
     case "message":
       return MessageSquare;
     case "system":
+    case "info":
+    case "warning":
       return Star;
     default:
       return Bell;
@@ -134,6 +56,7 @@ const getNotificationIcon = (type: Notification["type"]) => {
 const getNotificationColor = (type: Notification["type"]) => {
   switch (type) {
     case "application":
+    case "success":
       return "bg-blue-100 text-blue-600";
     case "interview":
       return "bg-purple-100 text-purple-600";
@@ -141,19 +64,101 @@ const getNotificationColor = (type: Notification["type"]) => {
       return "bg-emerald-100 text-emerald-600";
     case "message":
       return "bg-amber-100 text-amber-600";
+    case "warning":
+      return "bg-orange-100 text-orange-600";
+    case "error":
+      return "bg-red-100 text-red-600";
     case "system":
-      return "bg-gray-100 text-gray-600";
+    case "info":
     default:
       return "bg-gray-100 text-gray-600";
   }
 };
 
+function formatNotificationDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "Unknown";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const notificationDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (notificationDate.getTime() === today.getTime()) {
+    return "Today";
+  } else if (notificationDate.getTime() === yesterday.getTime()) {
+    return "Yesterday";
+  } else {
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+}
+
+function formatNotificationTime(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
 type FilterType = "all" | "unread" | "application" | "interview" | "job" | "message" | "system";
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/notifications");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        // Transform API response to match our interface
+        const transformedNotifications: Notification[] = result.data.map((n: {
+          id: string;
+          type: string;
+          title: string;
+          message?: string;
+          description?: string;
+          link?: string;
+          read: boolean;
+          createdAt: string;
+        }) => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          description: n.message || n.description || "",
+          time: formatNotificationTime(n.createdAt),
+          date: formatNotificationDate(n.createdAt),
+          read: n.read,
+          link: n.link,
+        }));
+
+        setNotifications(transformedNotifications);
+        if (showToast) {
+          toast.success("Notifications refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch notifications");
+      }
+    } catch (error) {
+      console.error("Fetch notifications error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh notifications");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -176,23 +181,140 @@ export default function NotificationsPage() {
     return groups;
   }, {} as Record<string, Notification[]>);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    setActionLoading(id);
+
+    // Optimistic update
     setNotifications(
       notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id, action: "markRead" }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        // Revert on error
+        setNotifications(
+          notifications.map((n) => (n.id === id ? { ...n, read: false } : n))
+        );
+        toast.error("Failed to mark as read");
+      }
+    } catch (error) {
+      console.error("Mark as read error:", error);
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, read: false } : n))
+      );
+      toast.error("Failed to mark as read");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    setActionLoading("all");
+
+    // Store previous state
+    const previousNotifications = [...notifications];
+
+    // Optimistic update
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
+
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "markAllRead" }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("All notifications marked as read");
+      } else {
+        setNotifications(previousNotifications);
+        toast.error("Failed to mark all as read");
+      }
+    } catch (error) {
+      console.error("Mark all as read error:", error);
+      setNotifications(previousNotifications);
+      toast.error("Failed to mark all as read");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const deleteNotification = (id: string) => {
+  const deleteNotification = async (id: string) => {
+    setActionLoading(id);
+
+    // Store for revert
+    const previousNotifications = [...notifications];
+
+    // Optimistic update
     setNotifications(notifications.filter((n) => n.id !== id));
+
+    try {
+      const response = await fetch(`/api/notifications?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("Notification deleted");
+      } else {
+        setNotifications(previousNotifications);
+        toast.error("Failed to delete notification");
+      }
+    } catch (error) {
+      console.error("Delete notification error:", error);
+      setNotifications(previousNotifications);
+      toast.error("Failed to delete notification");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const deleteAllRead = () => {
+  const deleteAllRead = async () => {
+    setActionLoading("deleteRead");
+
+    // Store for revert
+    const previousNotifications = [...notifications];
+    const readCount = notifications.filter((n) => n.read).length;
+
+    // Optimistic update
     setNotifications(notifications.filter((n) => !n.read));
+
+    try {
+      const response = await fetch("/api/notifications?all=true", {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`Deleted ${readCount} read notification${readCount !== 1 ? "s" : ""}`);
+      } else {
+        setNotifications(previousNotifications);
+        toast.error("Failed to delete read notifications");
+      }
+    } catch (error) {
+      console.error("Delete all read error:", error);
+      setNotifications(previousNotifications);
+      toast.error("Failed to delete read notifications");
+    } finally {
+      setActionLoading(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -207,14 +329,44 @@ export default function NotificationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchNotifications(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead} className="gap-2">
-              <CheckCheck className="w-4 h-4" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={markAllAsRead}
+              disabled={actionLoading === "all"}
+              className="gap-2"
+            >
+              {actionLoading === "all" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCheck className="w-4 h-4" />
+              )}
               Mark all read
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={deleteAllRead} className="gap-2 text-gray-600">
-            <Trash2 className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={deleteAllRead}
+            disabled={actionLoading === "deleteRead" || notifications.filter((n) => n.read).length === 0}
+            className="gap-2 text-gray-600"
+          >
+            {actionLoading === "deleteRead" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
             Clear read
           </Button>
         </div>
@@ -271,6 +423,7 @@ export default function NotificationsPage() {
                 {dateNotifications.map((notification) => {
                   const Icon = getNotificationIcon(notification.type);
                   const colorClass = getNotificationColor(notification.type);
+                  const isLoading = actionLoading === notification.id;
 
                   return (
                     <div
@@ -287,7 +440,7 @@ export default function NotificationsPage() {
                         {notification.link ? (
                           <Link
                             href={notification.link}
-                            onClick={() => markAsRead(notification.id)}
+                            onClick={() => !notification.read && markAsRead(notification.id)}
                             className="block"
                           >
                             <p className={cn(
@@ -319,18 +472,28 @@ export default function NotificationsPage() {
                         {!notification.read && (
                           <button
                             onClick={() => markAsRead(notification.id)}
-                            className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                            disabled={isLoading}
+                            className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                             title="Mark as read"
                           >
-                            <Check className="w-4 h-4" />
+                            {isLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
                           </button>
                         )}
                         <button
                           onClick={() => deleteNotification(notification.id)}
-                          className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-600"
+                          disabled={isLoading}
+                          className="p-2 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-600 disabled:opacity-50"
                           title="Delete"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {isLoading && notification.read ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </div>

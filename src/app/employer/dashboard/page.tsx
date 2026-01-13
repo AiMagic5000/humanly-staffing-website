@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -13,126 +14,52 @@ import {
   MapPin,
   DollarSign,
   MoreHorizontal,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-// Mock data for the employer dashboard
-const stats = [
-  {
-    name: "Active Jobs",
-    value: "8",
-    change: "+2 this month",
-    changeType: "positive",
-    icon: Briefcase,
-    color: "blue",
-  },
-  {
-    name: "Total Applications",
-    value: "156",
-    change: "+23 this week",
-    changeType: "positive",
-    icon: Users,
-    color: "emerald",
-  },
-  {
-    name: "Profile Views",
-    value: "2,847",
-    change: "+12% vs last month",
-    changeType: "positive",
-    icon: Eye,
-    color: "purple",
-  },
-  {
-    name: "Hire Rate",
-    value: "68%",
-    change: "+5% vs last month",
-    changeType: "positive",
-    icon: TrendingUp,
-    color: "amber",
-  },
-];
+interface Application {
+  id: string;
+  candidate: string;
+  position: string;
+  appliedAt: string;
+  status: string;
+  avatar: string;
+  experience: string;
+  location: string;
+}
 
-const recentApplications = [
-  {
-    id: 1,
-    candidate: "Sarah Johnson",
-    position: "Senior Software Engineer",
-    appliedAt: "2 hours ago",
-    status: "new",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-    experience: "8 years",
-    location: "San Francisco, CA",
-  },
-  {
-    id: 2,
-    candidate: "Michael Chen",
-    position: "Product Manager",
-    appliedAt: "5 hours ago",
-    status: "reviewing",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-    experience: "6 years",
-    location: "New York, NY",
-  },
-  {
-    id: 3,
-    candidate: "Emily Rodriguez",
-    position: "UX Designer",
-    appliedAt: "1 day ago",
-    status: "shortlisted",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-    experience: "5 years",
-    location: "Austin, TX",
-  },
-  {
-    id: 4,
-    candidate: "David Kim",
-    position: "Senior Software Engineer",
-    appliedAt: "1 day ago",
-    status: "interviewed",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-    experience: "10 years",
-    location: "Seattle, WA",
-  },
-];
+interface Job {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  type: string;
+  salary: string;
+  applications: number;
+  views: number;
+  postedAt: string;
+  status: string;
+}
 
-const activeJobs = [
-  {
-    id: 1,
-    title: "Senior Software Engineer",
-    department: "Engineering",
-    location: "San Francisco, CA",
-    type: "Full-time",
-    salary: "$150k - $200k",
-    applications: 45,
-    views: 892,
-    postedAt: "Jan 5, 2025",
-    status: "active",
-  },
-  {
-    id: 2,
-    title: "Product Manager",
-    department: "Product",
-    location: "Remote",
-    type: "Full-time",
-    salary: "$130k - $170k",
-    applications: 38,
-    views: 654,
-    postedAt: "Jan 8, 2025",
-    status: "active",
-  },
-  {
-    id: 3,
-    title: "UX Designer",
-    department: "Design",
-    location: "New York, NY",
-    type: "Full-time",
-    salary: "$100k - $140k",
-    applications: 29,
-    views: 521,
-    postedAt: "Jan 10, 2025",
-    status: "active",
-  },
-];
+interface EmployerAnalytics {
+  stats: {
+    activeJobs: number;
+    totalApplications: number;
+    profileViews: number;
+    hireRate: number;
+  };
+  changes: {
+    jobs: string;
+    applications: string;
+    views: string;
+    hireRate: string;
+  };
+  recentApplications: Application[];
+  activeJobs: Job[];
+}
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   new: { bg: "bg-blue-100", text: "text-blue-700", label: "New" },
@@ -150,8 +77,118 @@ function getGreeting(): string {
   return "Good evening";
 }
 
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "Unknown";
+
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function EmployerDashboard() {
+  const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const greeting = getGreeting();
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async (showToast = false) => {
+    try {
+      if (showToast) setRefreshing(true);
+
+      const response = await fetch("/api/employer/analytics");
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAnalytics(result.data);
+        if (showToast) {
+          toast.success("Dashboard refreshed");
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch analytics");
+      }
+    } catch (error) {
+      console.error("Fetch analytics error:", error);
+      if (showToast) {
+        toast.error("Failed to refresh dashboard");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-gray-600">Failed to load dashboard data</p>
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      name: "Active Jobs",
+      value: analytics.stats.activeJobs.toString(),
+      change: analytics.changes.jobs,
+      changeType: "positive",
+      icon: Briefcase,
+      color: "blue",
+    },
+    {
+      name: "Total Applications",
+      value: analytics.stats.totalApplications.toString(),
+      change: analytics.changes.applications,
+      changeType: "positive",
+      icon: Users,
+      color: "emerald",
+    },
+    {
+      name: "Profile Views",
+      value: analytics.stats.profileViews.toLocaleString(),
+      change: analytics.changes.views,
+      changeType: "positive",
+      icon: Eye,
+      color: "purple",
+    },
+    {
+      name: "Hire Rate",
+      value: `${analytics.stats.hireRate}%`,
+      change: analytics.changes.hireRate,
+      changeType: "positive",
+      icon: TrendingUp,
+      color: "amber",
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -163,9 +200,21 @@ export default function EmployerDashboard() {
             Here&apos;s what&apos;s happening with your job postings today.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/employer/jobs/new">Post New Job</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAnalytics(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/employer/jobs/new">Post New Job</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -231,7 +280,7 @@ export default function EmployerDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {recentApplications.map((application) => (
+            {analytics.recentApplications.map((application) => (
               <div
                 key={application.id}
                 className="px-6 py-4 hover:bg-gray-50 transition-colors"
@@ -256,10 +305,10 @@ export default function EmployerDashboard() {
                       </div>
                       <span
                         className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                          statusColors[application.status].bg
-                        } ${statusColors[application.status].text}`}
+                          statusColors[application.status]?.bg || "bg-gray-100"
+                        } ${statusColors[application.status]?.text || "text-gray-700"}`}
                       >
-                        {statusColors[application.status].label}
+                        {statusColors[application.status]?.label || application.status}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
@@ -273,7 +322,7 @@ export default function EmployerDashboard() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {application.appliedAt}
+                        {formatTimeAgo(application.appliedAt)}
                       </span>
                     </div>
                   </div>
@@ -296,7 +345,7 @@ export default function EmployerDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {activeJobs.map((job) => (
+            {analytics.activeJobs.map((job) => (
               <div
                 key={job.id}
                 className="px-6 py-4 hover:bg-gray-50 transition-colors"
@@ -320,7 +369,7 @@ export default function EmployerDashboard() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
-                        Posted {job.postedAt}
+                        Posted {formatDate(job.postedAt)}
                       </span>
                     </div>
                   </div>
