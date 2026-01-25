@@ -108,13 +108,11 @@ export default function ServicesPage() {
       {/* Services List */}
       <section className="py-20 bg-white">
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
-          <div className="space-y-24">
+          <div className="space-y-16 sm:space-y-20 lg:space-y-24">
             {services.map((service, index) => (
               <div
                 key={service.title}
-                className={`grid gap-12 lg:grid-cols-2 items-center ${
-                  index % 2 === 1 ? "lg:flex-row-reverse" : ""
-                }`}
+                className="grid gap-8 sm:gap-10 lg:gap-12 lg:grid-cols-2 items-center"
               >
                 <div className={index % 2 === 1 ? "lg:order-2" : ""}>
                   <div className={`inline-flex rounded-xl ${service.color} p-4 text-white mb-6`}>

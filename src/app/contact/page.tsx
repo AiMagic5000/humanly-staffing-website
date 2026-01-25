@@ -196,30 +196,30 @@ export default function ContactPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         I am a...
                       </label>
-                      <div className="flex gap-3">
-                        <label className="flex-1">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <label className="min-w-0">
                           <input
                             type="radio"
                             {...register("type")}
                             value="candidate"
                             className="sr-only peer"
                           />
-                          <div className="text-center py-3 px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors">
+                          <div className="text-center py-2.5 sm:py-3 px-2 sm:px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors text-xs sm:text-sm truncate">
                             Job Seeker
                           </div>
                         </label>
-                        <label className="flex-1">
+                        <label className="min-w-0">
                           <input
                             type="radio"
                             {...register("type")}
                             value="employer"
                             className="sr-only peer"
                           />
-                          <div className="text-center py-3 px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors">
+                          <div className="text-center py-2.5 sm:py-3 px-2 sm:px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors text-xs sm:text-sm truncate">
                             Employer
                           </div>
                         </label>
-                        <label className="flex-1">
+                        <label className="min-w-0">
                           <input
                             type="radio"
                             {...register("type")}
@@ -227,7 +227,7 @@ export default function ContactPage() {
                             className="sr-only peer"
                             defaultChecked
                           />
-                          <div className="text-center py-3 px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors">
+                          <div className="text-center py-2.5 sm:py-3 px-2 sm:px-4 border border-gray-300 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 hover:bg-gray-50 transition-colors text-xs sm:text-sm truncate">
                             Other
                           </div>
                         </label>

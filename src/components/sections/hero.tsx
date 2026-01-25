@@ -63,9 +63,9 @@ export function Hero() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 mb-6"
+              className="inline-flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-blue-50 border border-blue-100 mb-6 max-w-full"
             >
-              <div className="flex -space-x-2">
+              <div className="flex -space-x-2 flex-shrink-0">
                 {trustBadgeImages.map((img, i) => (
                   <Image
                     key={i}
@@ -73,16 +73,16 @@ export function Hero() {
                     alt={`Customer ${i + 1}`}
                     width={28}
                     height={28}
-                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-white object-cover"
                   />
                 ))}
               </div>
-              <span className="text-sm font-medium text-blue-900">
-                Trusted by 500+ companies worldwide
+              <span className="text-xs sm:text-sm font-medium text-blue-900">
+                Trusted by 500+ companies
               </span>
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5 flex-shrink-0">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                  <Star key={i} className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
             </motion.div>
@@ -134,8 +134,8 @@ export function Hero() {
                     className="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 border-0 text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                   />
                 </div>
-                <Button size="lg" className="px-8 py-4 h-auto text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25" asChild>
-                  <Link href="/jobs" className="flex items-center gap-2">
+                <Button size="lg" className="w-full sm:w-auto px-6 sm:px-8 py-4 h-auto text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25" asChild>
+                  <Link href="/jobs" className="flex items-center justify-center gap-2">
                     Search Jobs
                     <ArrowRight className="h-4 w-4" />
                   </Link>
@@ -162,22 +162,22 @@ export function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.5 }}
-              className="mt-10 flex flex-col sm:flex-row gap-4"
+              className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4"
             >
-              <Button asChild size="lg" className="px-8 py-6 h-auto text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25">
-                <Link href="/employers/request-talent" className="flex items-center gap-2">
+              <Button asChild size="lg" className="w-full sm:w-auto px-6 sm:px-8 py-5 sm:py-6 h-auto text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25">
+                <Link href="/employers/request-talent" className="flex items-center justify-center gap-2">
                   <Users className="h-5 w-5" />
                   Hire Talent
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="px-8 py-6 h-auto text-base font-semibold rounded-xl border-2 border-gray-200 hover:border-blue-200 hover:bg-blue-50">
-                <Link href="/jobs" className="flex items-center gap-2">
+              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto px-6 sm:px-8 py-5 sm:py-6 h-auto text-base font-semibold rounded-xl border-2 border-gray-200 hover:border-blue-200 hover:bg-blue-50">
+                <Link href="/jobs" className="flex items-center justify-center gap-2">
                   <Briefcase className="h-5 w-5" />
                   Find Jobs
                 </Link>
               </Button>
-              <Button variant="ghost" size="lg" className="px-6 py-6 h-auto text-base font-semibold rounded-xl text-gray-600 hover:text-blue-600" asChild>
-                <Link href="/about" className="flex items-center gap-2">
+              <Button variant="ghost" size="lg" className="w-full sm:w-auto px-6 py-5 sm:py-6 h-auto text-base font-semibold rounded-xl text-gray-600 hover:text-blue-600" asChild>
+                <Link href="/about" className="flex items-center justify-center gap-2">
                   <Play className="h-5 w-5 fill-current" />
                   Watch How It Works
                 </Link>
@@ -189,10 +189,10 @@ export function Hero() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.5 }}
-              className="mt-12 pt-8 border-t border-gray-100"
+              className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-100"
             >
-              <div className="flex items-center gap-4">
-                <div className="flex -space-x-3">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                <div className="flex -space-x-2 sm:-space-x-3 flex-shrink-0">
                   {reviews.map((review, i) => (
                     <Image
                       key={i}
@@ -200,18 +200,18 @@ export function Hero() {
                       alt={review.name}
                       width={40}
                       height={40}
-                      className="w-10 h-10 rounded-full border-2 border-white object-cover shadow-md"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white object-cover shadow-md"
                     />
                   ))}
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((i) => (
-                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <Star key={i} className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400" />
                     ))}
-                    <span className="ml-2 text-sm font-semibold text-gray-900">4.9/5</span>
+                    <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-semibold text-gray-900">4.9/5</span>
                   </div>
-                  <p className="text-sm text-gray-600">from 500+ verified reviews</p>
+                  <p className="text-xs sm:text-sm text-gray-600">from 500+ verified reviews</p>
                 </div>
               </div>
             </motion.div>

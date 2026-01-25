@@ -120,42 +120,42 @@ export default function EmployersPage() {
                 </Button>
               </div>
               {/* Trust indicators */}
-              <div className="mt-10 flex items-center gap-4">
-                <div className="flex -space-x-2">
+              <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4">
+                <div className="flex -space-x-2 flex-shrink-0">
                   {[
                     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop",
                     "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop",
                     "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop",
                   ].map((img, i) => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white overflow-hidden">
+                    <div key={i} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white overflow-hidden">
                       <Image src={img} alt="Client" width={40} height={40} className="object-cover" />
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <Star key={i} className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400" />
                   ))}
                 </div>
-                <span className="text-white/80 text-sm">4.9/5 from 200+ reviews</span>
+                <span className="text-white/80 text-xs sm:text-sm">4.9/5 from 200+ reviews</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-white/10 backdrop-blur p-6 text-white text-center">
-                <p className="text-4xl font-bold">{siteConfig.stats.placements}</p>
-                <p className="mt-2 text-blue-100">Placements</p>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-8 lg:mt-0">
+              <div className="rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur p-4 sm:p-6 text-white text-center">
+                <p className="text-2xl sm:text-4xl font-bold">{siteConfig.stats.placements}</p>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-base text-blue-100">Placements</p>
               </div>
-              <div className="rounded-2xl bg-white/10 backdrop-blur p-6 text-white text-center">
-                <p className="text-4xl font-bold">{siteConfig.stats.satisfaction}</p>
-                <p className="mt-2 text-blue-100">Satisfaction</p>
+              <div className="rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur p-4 sm:p-6 text-white text-center">
+                <p className="text-2xl sm:text-4xl font-bold">{siteConfig.stats.satisfaction}</p>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-base text-blue-100">Satisfaction</p>
               </div>
-              <div className="rounded-2xl bg-white/10 backdrop-blur p-6 text-white text-center">
-                <p className="text-4xl font-bold">14</p>
-                <p className="mt-2 text-blue-100">Avg. Days to Fill</p>
+              <div className="rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur p-4 sm:p-6 text-white text-center">
+                <p className="text-2xl sm:text-4xl font-bold">14</p>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-base text-blue-100">Avg. Days to Fill</p>
               </div>
-              <div className="rounded-2xl bg-white/10 backdrop-blur p-6 text-white text-center">
-                <p className="text-4xl font-bold">90</p>
-                <p className="mt-2 text-blue-100">Day Guarantee</p>
+              <div className="rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur p-4 sm:p-6 text-white text-center">
+                <p className="text-2xl sm:text-4xl font-bold">90</p>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-base text-blue-100">Day Guarantee</p>
               </div>
             </div>
           </div>

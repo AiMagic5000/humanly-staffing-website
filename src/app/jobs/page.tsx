@@ -254,40 +254,40 @@ export default function JobsPage() {
                   >
                     <Link
                       href={`/jobs/${job.id}`}
-                      className="block bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all"
+                      className="block bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <Badge>{job.industry}</Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
+                            <Badge className="text-xs">{job.industry}</Badge>
                             {job.featured && (
-                              <Badge variant="success">Featured</Badge>
+                              <Badge variant="success" className="text-xs">Featured</Badge>
                             )}
-                            <Badge variant="outline">{job.type}</Badge>
+                            <Badge variant="outline" className="text-xs">{job.type}</Badge>
                           </div>
-                          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors truncate">
                             {job.title}
                           </h3>
-                          <p className="mt-1 text-gray-600">{job.company}</p>
-                          <p className="mt-2 text-sm text-gray-500 line-clamp-2">
+                          <p className="mt-1 text-sm sm:text-base text-gray-600">{job.company}</p>
+                          <p className="mt-2 text-xs sm:text-sm text-gray-500 line-clamp-2">
                             {job.description}
                           </p>
-                          <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
+                          <div className="mt-3 sm:mt-4 flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {job.location}
+                              <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="truncate max-w-[120px] sm:max-w-none">{job.location}</span>
                             </span>
                             <span className="flex items-center gap-1">
-                              <DollarSign className="h-4 w-4" />
-                              {job.salary}
+                              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="truncate">{job.salary}</span>
                             </span>
                             <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
+                              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                               {new Date(job.postedDate).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
-                        <Button className="sm:self-center">Apply Now</Button>
+                        <Button className="w-full sm:w-auto sm:self-center mt-2 sm:mt-0">Apply Now</Button>
                       </div>
                     </Link>
                   </motion.div>
