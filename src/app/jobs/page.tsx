@@ -571,9 +571,7 @@ export default function JobsPage() {
                       transition={{ duration: 0.3, delay: index * 0.03 }}
                     >
                       <Link
-                        href={job.source === 'internal' ? `/jobs/${job.externalId}` : job.applyUrl}
-                        target={job.source === 'internal' ? '_self' : '_blank'}
-                        rel={job.source !== 'internal' ? 'noopener noreferrer' : undefined}
+                        href={`/jobs/${job.externalId}`}
                         className="block bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all duration-200 group"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -671,10 +669,10 @@ export default function JobsPage() {
                             )}
                           </div>
 
-                          {/* Apply Button */}
+                          {/* View Job Button */}
                           <div className="flex sm:flex-col gap-2 sm:gap-3 mt-2 sm:mt-0">
                             <Button className="flex-1 sm:flex-none h-10 sm:h-11 px-4 sm:px-6 text-sm">
-                              {job.source === 'internal' ? 'View Job' : 'Apply Now'}
+                              View Job
                             </Button>
                           </div>
                         </div>
