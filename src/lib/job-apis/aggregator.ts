@@ -27,19 +27,46 @@ function getCacheKey(params: JobSearchParams): string {
   return JSON.stringify(params);
 }
 
-// Fetch jobs from database
-async function fetchDatabaseJobs(params: JobSearchParams): Promise<ExternalJob[]> {
+// Fetch jobs from database with pagination support
+async function fetchDatabaseJobs(params: JobSearchParams): Promise<{ jobs: ExternalJob[]; total: number }> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl || supabaseUrl.includes('your-project')) {
       console.log('Database not configured, skipping DB fetch');
-      return [];
+      return { jobs: [], total: 0 };
     }
 
+    // First get total count
+    let countQuery = supabaseAdmin
+      .from('humanly_jobs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'active');
+
+    // Apply same filters for count
+    if (params.query) {
+      countQuery = countQuery.or(`title.ilike.%${params.query}%,company.ilike.%${params.query}%,description.ilike.%${params.query}%`);
+    }
+    if (params.location) {
+      countQuery = countQuery.ilike('location', `%${params.location}%`);
+    }
+    if (params.industry) {
+      countQuery = countQuery.eq('industry', params.industry);
+    }
+    if (params.type) {
+      countQuery = countQuery.eq('job_type', params.type);
+    }
+    if (params.remote) {
+      countQuery = countQuery.eq('remote', true);
+    }
+
+    const { count: totalCount } = await countQuery;
+
+    // Now fetch paginated data
     let query = supabaseAdmin
       .from('humanly_jobs')
       .select('*')
       .eq('status', 'active')
+      .order('featured', { ascending: false })
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -59,7 +86,7 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<ExternalJob[]
       query = query.eq('remote', true);
     }
 
-    const limit = params.limit || 100;
+    const limit = params.limit || 50;
     const page = params.page || 1;
     const offset = (page - 1) * limit;
 
@@ -69,18 +96,18 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<ExternalJob[]
 
     if (error) {
       console.error('Database fetch error:', error);
-      return [];
+      return { jobs: [], total: 0 };
     }
 
     // Convert to ExternalJob format
-    return (jobs || []).map(job => ({
+    const convertedJobs = (jobs || []).map(job => ({
       id: `db_${job.id}`,
       source: 'database' as const,
       externalId: job.id,
       title: job.title,
       company: job.company,
       location: job.location,
-      locationType: job.remote ? 'remote' : 'onsite',
+      locationType: job.remote ? 'remote' as const : 'onsite' as const,
       type: job.job_type || 'full-time',
       salary: job.salary_min && job.salary_max
         ? `$${job.salary_min.toLocaleString()} - $${job.salary_max.toLocaleString()}`
@@ -99,9 +126,11 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<ExternalJob[]
       expiresDate: job.expires_at,
       featured: job.featured || false,
     }));
+
+    return { jobs: convertedJobs, total: totalCount || 0 };
   } catch (error) {
     console.error('Error fetching database jobs:', error);
-    return [];
+    return { jobs: [], total: 0 };
   }
 }
 
@@ -200,9 +229,12 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
 
   // Fetch from database first (primary source)
   let databaseJobs: ExternalJob[] = [];
+  let databaseTotal = 0;
   if (API_CONFIG.database.enabled) {
-    databaseJobs = await fetchDatabaseJobs(params);
-    console.log(`Fetched ${databaseJobs.length} jobs from database`);
+    const dbResult = await fetchDatabaseJobs(params);
+    databaseJobs = dbResult.jobs;
+    databaseTotal = dbResult.total;
+    console.log(`Fetched ${databaseJobs.length} jobs from database (total: ${databaseTotal})`);
   }
 
   // Fetch from external APIs in parallel (if enabled)
@@ -280,7 +312,8 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
 
   // Combine all jobs - database jobs first (primary source)
   let allJobs = [...databaseJobs, ...filteredInternalJobs];
-  let totalCount = databaseJobs.length + filteredInternalJobs.length;
+  // Use the actual database total (not just fetched page count) for accurate pagination
+  let totalCount = databaseTotal + filteredInternalJobs.length;
 
   for (const result of results) {
     allJobs = allJobs.concat(result.jobs);
@@ -298,17 +331,18 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
   allJobs = deduplicateJobs(allJobs);
   allJobs = sortJobs(allJobs, params.query);
 
-  // Apply pagination
+  // Pagination is handled at database level, so allJobs is already the correct page
+  // Only apply secondary pagination if combining multiple sources with different pagination
   const page = params.page || 1;
   const limit = params.limit || 50;
-  const startIndex = (page - 1) * limit;
-  const paginatedJobs = allJobs.slice(startIndex, startIndex + limit);
 
+  // When only database is active (our current config), jobs are already paginated
+  // For mixed sources, we'd need to handle this differently
   const response: JobApiResponse = {
-    jobs: paginatedJobs,
-    total: allJobs.length,
+    jobs: allJobs, // Already paginated from database
+    total: totalCount, // Use actual total count for proper pagination
     page,
-    totalPages: Math.ceil(allJobs.length / limit),
+    totalPages: Math.ceil(totalCount / limit),
     source: 'aggregated',
   };
 
@@ -341,20 +375,29 @@ export async function getJobStats(): Promise<{
   byIndustry: Record<string, number>;
   byType: Record<string, number>;
   bySource: Record<string, number>;
+  byLocationType: Record<string, number>;
+  remoteCount: number;
 }> {
-  const response = await searchAllJobs({ limit: 500 });
+  // Get a larger sample for accurate stats
+  const response = await searchAllJobs({ limit: 1500 });
 
   const stats = {
     totalJobs: response.total,
     byIndustry: {} as Record<string, number>,
     byType: {} as Record<string, number>,
     bySource: {} as Record<string, number>,
+    byLocationType: {} as Record<string, number>,
+    remoteCount: 0,
   };
 
   for (const job of response.jobs) {
     stats.byIndustry[job.industry] = (stats.byIndustry[job.industry] || 0) + 1;
     stats.byType[job.type] = (stats.byType[job.type] || 0) + 1;
     stats.bySource[job.source] = (stats.bySource[job.source] || 0) + 1;
+    stats.byLocationType[job.locationType] = (stats.byLocationType[job.locationType] || 0) + 1;
+    if (job.locationType === 'remote') {
+      stats.remoteCount++;
+    }
   }
 
   return stats;

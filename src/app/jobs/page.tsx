@@ -82,6 +82,8 @@ interface JobStats {
   byIndustry: Record<string, number>;
   byType: Record<string, number>;
   bySource: Record<string, number>;
+  byLocationType: Record<string, number>;
+  remoteCount: number;
 }
 
 export default function JobsPage() {
@@ -263,7 +265,7 @@ export default function JobsPage() {
                 <div className="flex items-center gap-2 text-blue-100 text-xs sm:text-sm">
                   <Globe className="h-4 w-4" />
                   <span>
-                    <strong className="text-white">{stats.bySource.remotive || 0}</strong> remote jobs
+                    <strong className="text-white">{stats.remoteCount || 0}</strong> remote jobs
                   </span>
                 </div>
               </motion.div>
