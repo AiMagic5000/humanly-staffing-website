@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:jobs": "npx tsx scripts/seed-jobs-all-apis.ts",
+    "seed:jobs:dry": "npx tsx scripts/seed-jobs-all-apis.ts --dry-run",
+    "seed:jobs:import": "npx tsx scripts/seed-jobs-all-apis.ts --import"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",

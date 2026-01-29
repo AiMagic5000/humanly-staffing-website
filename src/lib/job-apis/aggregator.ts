@@ -7,14 +7,16 @@ import { searchUSAJobs } from './usajobs';
 import { searchRemotiveJobs } from './remotive';
 import { searchArbeitnowJobs } from './arbeitnow';
 import { jobs as mockJobs } from '@/data/jobs';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // Configuration for which APIs to use
 const API_CONFIG = {
-  adzuna: { enabled: true, weight: 1.0 },
-  usajobs: { enabled: true, weight: 0.8 },
-  remotive: { enabled: true, weight: 0.9 },
-  arbeitnow: { enabled: true, weight: 0.7 },
-  internal: { enabled: true, weight: 1.2 }, // Our mock/internal jobs get priority
+  database: { enabled: true, weight: 1.5 }, // Database jobs get highest priority
+  adzuna: { enabled: false, weight: 1.0 }, // Disabled - we have DB jobs
+  usajobs: { enabled: false, weight: 0.8 }, // Disabled - we have DB jobs
+  remotive: { enabled: false, weight: 0.9 }, // Disabled - we have DB jobs
+  arbeitnow: { enabled: false, weight: 0.7 }, // Disabled - we have DB jobs
+  internal: { enabled: false, weight: 1.2 }, // Disabled - using DB instead
 };
 
 // Simple in-memory cache for aggregated results
@@ -23,6 +25,84 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: JobSearchParams): string {
   return JSON.stringify(params);
+}
+
+// Fetch jobs from database
+async function fetchDatabaseJobs(params: JobSearchParams): Promise<ExternalJob[]> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl || supabaseUrl.includes('your-project')) {
+      console.log('Database not configured, skipping DB fetch');
+      return [];
+    }
+
+    let query = supabaseAdmin
+      .from('humanly_jobs')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (params.query) {
+      query = query.or(`title.ilike.%${params.query}%,company.ilike.%${params.query}%,description.ilike.%${params.query}%`);
+    }
+    if (params.location) {
+      query = query.ilike('location', `%${params.location}%`);
+    }
+    if (params.industry) {
+      query = query.eq('industry', params.industry);
+    }
+    if (params.type) {
+      query = query.eq('job_type', params.type);
+    }
+    if (params.remote) {
+      query = query.eq('remote', true);
+    }
+
+    const limit = params.limit || 100;
+    const page = params.page || 1;
+    const offset = (page - 1) * limit;
+
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: jobs, error } = await query;
+
+    if (error) {
+      console.error('Database fetch error:', error);
+      return [];
+    }
+
+    // Convert to ExternalJob format
+    return (jobs || []).map(job => ({
+      id: `db_${job.id}`,
+      source: 'database' as const,
+      externalId: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      locationType: job.remote ? 'remote' : 'onsite',
+      type: job.job_type || 'full-time',
+      salary: job.salary_min && job.salary_max
+        ? `$${job.salary_min.toLocaleString()} - $${job.salary_max.toLocaleString()}`
+        : null,
+      salaryMin: job.salary_min,
+      salaryMax: job.salary_max,
+      currency: 'USD',
+      industry: job.industry || 'general',
+      description: job.description || '',
+      requirements: job.requirements || [],
+      benefits: job.benefits || [],
+      skills: [],
+      applyUrl: `/jobs/${job.id}/apply`,
+      companyLogo: null,
+      postedDate: job.created_at,
+      expiresDate: job.expires_at,
+      featured: job.featured || false,
+    }));
+  } catch (error) {
+    console.error('Error fetching database jobs:', error);
+    return [];
+  }
 }
 
 // Convert internal mock jobs to ExternalJob format
@@ -118,7 +198,14 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
 
   console.log('Fetching jobs from all APIs...');
 
-  // Fetch from all APIs in parallel
+  // Fetch from database first (primary source)
+  let databaseJobs: ExternalJob[] = [];
+  if (API_CONFIG.database.enabled) {
+    databaseJobs = await fetchDatabaseJobs(params);
+    console.log(`Fetched ${databaseJobs.length} jobs from database`);
+  }
+
+  // Fetch from external APIs in parallel (if enabled)
   const apiPromises: Promise<JobApiResponse>[] = [];
 
   if (API_CONFIG.adzuna.enabled) {
@@ -149,8 +236,8 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
     }));
   }
 
-  // Also include internal jobs
-  const internalJobs = convertMockJobs();
+  // Also include internal jobs (if enabled)
+  const internalJobs = API_CONFIG.internal.enabled ? convertMockJobs() : [];
   let filteredInternalJobs = internalJobs;
 
   // Apply filters to internal jobs
@@ -191,9 +278,9 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
   // Wait for all APIs
   const results = await Promise.all(apiPromises);
 
-  // Combine all jobs
-  let allJobs = [...filteredInternalJobs];
-  let totalCount = filteredInternalJobs.length;
+  // Combine all jobs - database jobs first (primary source)
+  let allJobs = [...databaseJobs, ...filteredInternalJobs];
+  let totalCount = databaseJobs.length + filteredInternalJobs.length;
 
   for (const result of results) {
     allJobs = allJobs.concat(result.jobs);

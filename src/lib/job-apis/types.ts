@@ -2,13 +2,13 @@
 
 export interface ExternalJob {
   id: string;
-  source: 'adzuna' | 'usajobs' | 'remotive' | 'arbeitnow' | 'internal';
+  source: 'database' | 'adzuna' | 'usajobs' | 'remotive' | 'arbeitnow' | 'internal';
   externalId: string;
   title: string;
   company: string;
   location: string;
   locationType: 'onsite' | 'remote' | 'hybrid';
-  type: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  type: 'full-time' | 'part-time' | 'contract' | 'temporary' | 'internship' | 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
   salary: string | null;
   salaryMin: number | null;
   salaryMax: number | null;
