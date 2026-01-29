@@ -116,7 +116,7 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="lg:pl-72">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-gray-200">
+        <header className="sticky top-0 z-[55] h-16 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between h-full px-4 lg:px-8">
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
