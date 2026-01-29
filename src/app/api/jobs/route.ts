@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-
-export const dynamic = "force-dynamic";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
-import { jobs as mockJobs } from "@/data/jobs";
+import { searchAllJobs, getFeaturedJobs, getJobStats, clearJobCache } from "@/lib/job-apis";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const jobSchema = z.object({
   title: z.string().min(5, "Job title must be at least 5 characters"),
@@ -25,78 +26,74 @@ const jobSchema = z.object({
   startDate: z.string().optional(),
 });
 
-// GET - List jobs (public or filtered by employer)
+// GET - List jobs with aggregation from multiple sources
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const employerId = searchParams.get("employerId");
-    const status = searchParams.get("status");
-    const featured = searchParams.get("featured");
+
+    // Parse query parameters
+    const query = searchParams.get("query") || undefined;
+    const location = searchParams.get("location") || undefined;
+    const industry = searchParams.get("industry") || undefined;
+    const type = searchParams.get("type") || undefined;
+    const remote = searchParams.get("remote") === "true";
+    const featured = searchParams.get("featured") === "true";
+    const refresh = searchParams.get("refresh") === "true";
+    const stats = searchParams.get("stats") === "true";
     const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const page = parseInt(searchParams.get("page") || "1");
 
-    // Check if Supabase is configured
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes("your-project");
+    // Clear cache if refresh requested
+    if (refresh) {
+      clearJobCache();
+    }
 
-    if (isSupabaseConfigured) {
-      let query = supabaseAdmin
-        .from("jobs")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false });
-
-      // Apply filters
-      if (employerId) {
-        query = query.eq("employer_id", employerId);
-      }
-      if (status) {
-        query = query.eq("status", status);
-      }
-      if (featured === "true") {
-        query = query.eq("featured", true);
-      }
-
-      // Apply pagination
-      query = query.range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
-
-      if (error) {
-        console.error("Database error:", error);
-        throw new Error("Failed to fetch jobs");
-      }
-
+    // Return job statistics if requested
+    if (stats) {
+      const jobStats = await getJobStats();
       return NextResponse.json({
         success: true,
-        jobs: data,
+        stats: jobStats,
+      });
+    }
+
+    // Return featured jobs for homepage
+    if (featured) {
+      const featuredJobs = await getFeaturedJobs(limit);
+      return NextResponse.json({
+        success: true,
+        jobs: featuredJobs,
         pagination: {
-          total: count,
+          total: featuredJobs.length,
           limit,
-          offset,
-          hasMore: (count || 0) > offset + limit,
+          page: 1,
+          hasMore: false,
         },
       });
     }
 
-    // Return mock data when database not configured
-    let filteredJobs = [...mockJobs];
-
-    // All mock jobs are active by default
-    if (featured === "true") {
-      filteredJobs = filteredJobs.filter((j) => j.featured);
-    }
-
-    const paginatedJobs = filteredJobs.slice(offset, offset + limit);
+    // Search all job sources
+    const response = await searchAllJobs({
+      query,
+      location,
+      industry,
+      type,
+      remote,
+      page,
+      limit,
+    });
 
     return NextResponse.json({
       success: true,
-      jobs: paginatedJobs,
+      jobs: response.jobs,
       pagination: {
-        total: filteredJobs.length,
+        total: response.total,
         limit,
-        offset,
-        hasMore: filteredJobs.length > offset + limit,
+        page: response.page,
+        totalPages: response.totalPages,
+        hasMore: response.page < response.totalPages,
       },
+      source: response.source,
     });
   } catch (error) {
     console.error("Error fetching jobs:", error);
@@ -163,6 +160,9 @@ export async function POST(request: NextRequest) {
         console.error("Database error:", error);
         throw new Error("Failed to create job");
       }
+
+      // Clear cache to include new job
+      clearJobCache();
 
       return NextResponse.json(
         {
@@ -276,6 +276,9 @@ export async function PATCH(request: NextRequest) {
         throw new Error("Failed to update job");
       }
 
+      // Clear cache to reflect updates
+      clearJobCache();
+
       return NextResponse.json({ success: true, job: data });
     }
 
@@ -350,6 +353,9 @@ export async function DELETE(request: NextRequest) {
         console.error("Database error:", error);
         throw new Error("Failed to delete job");
       }
+
+      // Clear cache to remove deleted job
+      clearJobCache();
 
       return NextResponse.json({
         success: true,
