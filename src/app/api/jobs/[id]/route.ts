@@ -16,13 +16,43 @@ export async function GET(
     const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes("your-project");
 
     if (isSupabaseConfigured) {
-      // Increment view count (ignore errors if RPC doesn't exist)
-      try {
-        await supabaseAdmin.rpc("increment_job_views", { job_id: id });
-      } catch {
-        // RPC may not exist, ignore
+      // First try humanly_jobs table (imported jobs)
+      const { data: humanlyJob, error: humanlyError } = await supabaseAdmin
+        .from("humanly_jobs")
+        .select("*")
+        .eq("id", id)
+        .eq("status", "active")
+        .single();
+
+      if (humanlyJob && !humanlyError) {
+        // Convert to standard job format
+        const job = {
+          id: humanlyJob.id,
+          externalId: humanlyJob.id,
+          title: humanlyJob.title,
+          company: humanlyJob.company,
+          location: humanlyJob.location,
+          locationType: humanlyJob.remote ? "remote" : "onsite",
+          type: humanlyJob.job_type || "full-time",
+          job_type: humanlyJob.job_type,
+          salary: humanlyJob.salary_min && humanlyJob.salary_max
+            ? `$${humanlyJob.salary_min.toLocaleString()} - $${humanlyJob.salary_max.toLocaleString()}`
+            : null,
+          salaryMin: humanlyJob.salary_min,
+          salaryMax: humanlyJob.salary_max,
+          industry: humanlyJob.industry || "general",
+          description: humanlyJob.description || "",
+          requirements: humanlyJob.requirements || [],
+          benefits: humanlyJob.benefits || [],
+          featured: humanlyJob.featured || false,
+          postedDate: humanlyJob.created_at,
+          expiresDate: humanlyJob.expires_at,
+          source: "database",
+        };
+        return NextResponse.json({ success: true, job });
       }
 
+      // Fall back to jobs table (employer-posted jobs)
       const { data, error } = await supabaseAdmin
         .from("jobs")
         .select(`

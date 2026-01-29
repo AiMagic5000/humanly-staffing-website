@@ -24,6 +24,19 @@ import { Input } from "@/components/ui/input";
 import { jobs } from "@/data/jobs";
 import { cn } from "@/lib/utils";
 
+interface JobData {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  salary?: string | null;
+  industry: string;
+  description: string;
+  requirements: string[];
+  benefits: string[];
+}
+
 const applicationSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
   lastName: z.string().min(2, "Last name is required"),
@@ -56,8 +69,52 @@ export default function ApplyPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
   const [isComplete, setIsComplete] = React.useState(false);
+  const [job, setJob] = React.useState<JobData | null>(null);
+  const [jobLoading, setJobLoading] = React.useState(true);
 
-  const job = jobs.find((j) => j.id === params.id);
+  // Fetch job data - first check mock data, then database
+  React.useEffect(() => {
+    const fetchJob = async () => {
+      const jobId = params.id as string;
+
+      // Check mock data first
+      const mockJob = jobs.find((j) => j.id === jobId);
+      if (mockJob) {
+        setJob(mockJob);
+        setJobLoading(false);
+        return;
+      }
+
+      // Fetch from database via API
+      try {
+        const response = await fetch(`/api/jobs/${jobId}`);
+        const data = await response.json();
+
+        if (data.success && data.job) {
+          setJob({
+            id: data.job.id || data.job.externalId,
+            title: data.job.title,
+            company: data.job.company,
+            location: data.job.location,
+            type: data.job.type || data.job.job_type,
+            salary: data.job.salary,
+            industry: data.job.industry,
+            description: data.job.description,
+            requirements: data.job.requirements || [],
+            benefits: data.job.benefits || [],
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching job:", error);
+      } finally {
+        setJobLoading(false);
+      }
+    };
+
+    if (params.id) {
+      fetchJob();
+    }
+  }, [params.id]);
 
   const {
     register,
@@ -83,6 +140,18 @@ export default function ApplyPage() {
       setValue("email", user.primaryEmailAddress?.emailAddress || "");
     }
   }, [user, setValue]);
+
+  // Loading state
+  if (jobLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading job details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!job) {
     return (

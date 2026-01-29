@@ -16,9 +16,102 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { jobs } from "@/data/jobs";
+import { supabaseAdmin } from "@/lib/supabase";
 
 // Force dynamic rendering to avoid Clerk issues during static generation
 export const dynamic = "force-dynamic";
+
+interface JobData {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  salary: string | null;
+  industry: string;
+  description: string;
+  requirements: string[];
+  benefits: string[];
+  featured?: boolean;
+  postedDate: string;
+}
+
+async function getJob(id: string): Promise<JobData | null> {
+  // Check mock data first
+  const mockJob = jobs.find((j) => j.id === id);
+  if (mockJob) {
+    return mockJob;
+  }
+
+  // Fetch from database
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl || supabaseUrl.includes("your-project")) {
+    return null;
+  }
+
+  try {
+    // Try humanly_jobs table first
+    const { data: humanlyJob, error } = await supabaseAdmin
+      .from("humanly_jobs")
+      .select("*")
+      .eq("id", id)
+      .eq("status", "active")
+      .single();
+
+    if (humanlyJob && !error) {
+      return {
+        id: humanlyJob.id,
+        title: humanlyJob.title,
+        company: humanlyJob.company,
+        location: humanlyJob.location,
+        type: humanlyJob.job_type || "full-time",
+        salary: humanlyJob.salary_min && humanlyJob.salary_max
+          ? `$${humanlyJob.salary_min.toLocaleString()} - $${humanlyJob.salary_max.toLocaleString()}`
+          : null,
+        industry: humanlyJob.industry || "general",
+        description: humanlyJob.description || "",
+        requirements: humanlyJob.requirements || [],
+        benefits: humanlyJob.benefits || [],
+        featured: humanlyJob.featured || false,
+        postedDate: humanlyJob.created_at,
+      };
+    }
+
+    // Try jobs table (employer-posted)
+    const { data: employerJob, error: employerError } = await supabaseAdmin
+      .from("jobs")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (employerJob && !employerError) {
+      return {
+        id: employerJob.id,
+        title: employerJob.title,
+        company: employerJob.company || "Unknown Company",
+        location: employerJob.location,
+        type: employerJob.type || employerJob.job_type || "full-time",
+        salary: employerJob.salary_range || null,
+        industry: employerJob.industry || "general",
+        description: employerJob.description || "",
+        requirements: employerJob.requirements ?
+          (typeof employerJob.requirements === 'string' ?
+            employerJob.requirements.split('\n').filter(Boolean) :
+            employerJob.requirements) : [],
+        benefits: employerJob.benefits ?
+          (typeof employerJob.benefits === 'string' ?
+            employerJob.benefits.split('\n').filter(Boolean) :
+            employerJob.benefits) : [],
+        featured: employerJob.featured || false,
+        postedDate: employerJob.created_at,
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching job from database:", error);
+  }
+
+  return null;
+}
 
 interface JobPageProps {
   params: Promise<{ id: string }>;
@@ -26,7 +119,7 @@ interface JobPageProps {
 
 export async function generateMetadata({ params }: JobPageProps): Promise<Metadata> {
   const { id } = await params;
-  const job = jobs.find((j) => j.id === id);
+  const job = await getJob(id);
 
   if (!job) {
     return {
@@ -42,12 +135,13 @@ export async function generateMetadata({ params }: JobPageProps): Promise<Metada
 
 export default async function JobDetailPage({ params }: JobPageProps) {
   const { id } = await params;
-  const job = jobs.find((j) => j.id === id);
+  const job = await getJob(id);
 
   if (!job) {
     notFound();
   }
 
+  // Get similar jobs from mock data for now
   const similarJobs = jobs
     .filter((j) => j.industry === job.industry && j.id !== job.id)
     .slice(0, 3);
