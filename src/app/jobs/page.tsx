@@ -504,6 +504,31 @@ export default function JobsPage() {
               )}
             </div>
 
+            {/* Top Pagination */}
+            {!loading && totalPages > 1 && (
+              <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchJobs(page - 1)}
+                  disabled={page <= 1 || loading}
+                  className="w-full sm:w-auto"
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-600 order-first sm:order-none">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => fetchJobs(page + 1)}
+                  disabled={page >= totalPages || loading}
+                  className="w-full sm:w-auto"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+
             {/* Loading State */}
             {loading && jobs.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 sm:py-20">
