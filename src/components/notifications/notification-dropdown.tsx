@@ -123,10 +123,10 @@ export function NotificationDropdown() {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[60]"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 z-50 w-96 bg-white rounded-xl shadow-lg border overflow-hidden">
+          <div className="absolute right-0 top-full mt-2 z-[60] w-96 bg-white rounded-xl shadow-lg border overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
               <h3 className="font-semibold text-gray-900">Notifications</h3>
