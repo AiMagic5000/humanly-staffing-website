@@ -42,7 +42,7 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<{ jobs: Exter
       .select('*', { count: 'exact', head: true })
       .eq('status', 'active');
 
-    // Apply same filters for count
+    // Apply same filters for count (case-insensitive)
     if (params.query) {
       countQuery = countQuery.or(`title.ilike.%${params.query}%,company.ilike.%${params.query}%,description.ilike.%${params.query}%`);
     }
@@ -50,10 +50,10 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<{ jobs: Exter
       countQuery = countQuery.ilike('location', `%${params.location}%`);
     }
     if (params.industry) {
-      countQuery = countQuery.eq('industry', params.industry);
+      countQuery = countQuery.ilike('industry', params.industry);
     }
     if (params.type) {
-      countQuery = countQuery.eq('job_type', params.type);
+      countQuery = countQuery.ilike('job_type', params.type);
     }
     if (params.remote) {
       countQuery = countQuery.eq('remote', true);
@@ -69,7 +69,7 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<{ jobs: Exter
       .order('featured', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Apply filters
+    // Apply filters (case-insensitive for industry and type)
     if (params.query) {
       query = query.or(`title.ilike.%${params.query}%,company.ilike.%${params.query}%,description.ilike.%${params.query}%`);
     }
@@ -77,10 +77,10 @@ async function fetchDatabaseJobs(params: JobSearchParams): Promise<{ jobs: Exter
       query = query.ilike('location', `%${params.location}%`);
     }
     if (params.industry) {
-      query = query.eq('industry', params.industry);
+      query = query.ilike('industry', params.industry);
     }
     if (params.type) {
-      query = query.eq('job_type', params.type);
+      query = query.ilike('job_type', params.type);
     }
     if (params.remote) {
       query = query.eq('remote', true);
