@@ -2,7 +2,7 @@
 
 export interface ExternalJob {
   id: string;
-  source: 'database' | 'adzuna' | 'usajobs' | 'remotive' | 'arbeitnow' | 'internal';
+  source: 'database' | 'adzuna' | 'usajobs' | 'remotive' | 'arbeitnow' | 'joinrise' | 'internal';
   externalId: string;
   title: string;
   company: string;

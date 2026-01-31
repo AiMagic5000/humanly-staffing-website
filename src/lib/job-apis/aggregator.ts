@@ -6,17 +6,19 @@ import { searchAdzunaJobs } from './adzuna';
 import { searchUSAJobs } from './usajobs';
 import { searchRemotiveJobs } from './remotive';
 import { searchArbeitnowJobs } from './arbeitnow';
+import { searchJoinRiseJobsMultiPage } from './joinrise';
 import { jobs as mockJobs } from '@/data/jobs';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // Configuration for which APIs to use
 const API_CONFIG = {
   database: { enabled: true, weight: 1.5 }, // Database jobs get highest priority
-  adzuna: { enabled: false, weight: 1.0 }, // Disabled - we have DB jobs
-  usajobs: { enabled: false, weight: 0.8 }, // Disabled - we have DB jobs
-  remotive: { enabled: false, weight: 0.9 }, // Disabled - we have DB jobs
-  arbeitnow: { enabled: false, weight: 0.7 }, // Disabled - we have DB jobs
-  internal: { enabled: false, weight: 1.2 }, // Disabled - using DB instead
+  joinrise: { enabled: true, weight: 1.3 }, // Free US jobs API - 10,000+ jobs, no key required
+  adzuna: { enabled: false, weight: 1.0 }, // Requires API keys
+  usajobs: { enabled: false, weight: 0.8 }, // Requires API keys
+  remotive: { enabled: false, weight: 0.9 }, // Disabled - mostly international
+  arbeitnow: { enabled: false, weight: 0.7 }, // Disabled - mostly international
+  internal: { enabled: false, weight: 1.2 }, // Mock data - disabled
 };
 
 // Simple in-memory cache for aggregated results
@@ -265,6 +267,14 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
     apiPromises.push(searchArbeitnowJobs(params).catch(err => {
       console.error('Arbeitnow fetch failed:', err);
       return { jobs: [], total: 0, page: 1, totalPages: 0, source: 'arbeitnow' };
+    }));
+  }
+
+  if (API_CONFIG.joinrise.enabled) {
+    // Fetch multiple pages from JoinRise for better US job coverage
+    apiPromises.push(searchJoinRiseJobsMultiPage({ ...params, limit: 200 }, 10).catch(err => {
+      console.error('JoinRise fetch failed:', err);
+      return { jobs: [], total: 0, page: 1, totalPages: 0, source: 'joinrise' };
     }));
   }
 

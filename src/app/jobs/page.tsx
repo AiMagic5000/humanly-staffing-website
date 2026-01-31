@@ -86,6 +86,8 @@ interface JobStats {
   remoteCount: number;
 }
 
+const jobsPerPageOptions = [24, 48, 96, 192];
+
 export default function JobsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndustry, setSelectedIndustry] = useState<string>("all");
@@ -93,6 +95,7 @@ export default function JobsPage() {
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [jobsPerPage, setJobsPerPage] = useState(24);
 
   const [jobs, setJobs] = useState<ExternalJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,14 +106,14 @@ export default function JobsPage() {
   const [totalJobs, setTotalJobs] = useState(0);
 
   // Fetch jobs from API
-  const fetchJobs = useCallback(async (pageNum: number = 1, refresh: boolean = false) => {
+  const fetchJobs = useCallback(async (pageNum: number = 1, refresh: boolean = false, limit: number = jobsPerPage) => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
       params.set("page", pageNum.toString());
-      params.set("limit", "24");
+      params.set("limit", limit.toString());
 
       if (searchQuery) params.set("query", searchQuery);
       if (selectedIndustry !== "all") params.set("industry", selectedIndustry);
@@ -140,7 +143,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedIndustry, selectedType, selectedLocation, remoteOnly]);
+  }, [searchQuery, selectedIndustry, selectedType, selectedLocation, remoteOnly, jobsPerPage]);
 
   // Fetch job statistics
   const fetchStats = useCallback(async () => {
@@ -205,10 +208,12 @@ export default function JobsPage() {
   const getSourceBadge = (source: string) => {
     const sourceColors: Record<string, string> = {
       internal: "bg-blue-100 text-blue-800",
+      database: "bg-emerald-100 text-emerald-800",
       adzuna: "bg-purple-100 text-purple-800",
       usajobs: "bg-green-100 text-green-800",
       remotive: "bg-orange-100 text-orange-800",
       arbeitnow: "bg-pink-100 text-pink-800",
+      joinrise: "bg-cyan-100 text-cyan-800",
     };
     return sourceColors[source] || "bg-gray-100 text-gray-800";
   };
@@ -449,7 +454,7 @@ export default function JobsPage() {
           <div className="flex-1 min-w-0">
             {/* Results Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
-              <div>
+              <div className="flex items-center gap-4">
                 <p className="text-gray-600 text-sm sm:text-base">
                   Showing{" "}
                   <span className="font-semibold text-gray-900">
@@ -461,6 +466,28 @@ export default function JobsPage() {
                   </span>{" "}
                   jobs
                 </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Per page:</span>
+                  <Select
+                    value={jobsPerPage.toString()}
+                    onValueChange={(val) => {
+                      const newLimit = parseInt(val);
+                      setJobsPerPage(newLimit);
+                      fetchJobs(1, false, newLimit);
+                    }}
+                  >
+                    <SelectTrigger className="w-20 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobsPerPageOptions.map((option) => (
+                        <SelectItem key={option} value={option.toString()}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               {hasActiveFilters && (
                 <div className="flex flex-wrap gap-2">
@@ -570,8 +597,10 @@ export default function JobsPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.03 }}
                     >
-                      <Link
-                        href={`/jobs/${job.externalId}`}
+                      <a
+                        href={job.source === 'database' || job.source === 'internal' ? `/jobs/${job.externalId}` : job.applyUrl}
+                        target={job.source === 'database' || job.source === 'internal' ? '_self' : '_blank'}
+                        rel={job.source === 'database' || job.source === 'internal' ? '' : 'noopener noreferrer'}
                         className="block bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all duration-200 group"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -676,7 +705,7 @@ export default function JobsPage() {
                             </Button>
                           </div>
                         </div>
-                      </Link>
+                      </a>
                     </motion.div>
                   ))}
                 </motion.div>
