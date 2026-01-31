@@ -23,7 +23,7 @@ const API_CONFIG = {
 
 // Simple in-memory cache for aggregated results
 const jobCache = new Map<string, { data: JobApiResponse; timestamp: number }>();
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes (longer due to larger job fetches)
 
 function getCacheKey(params: JobSearchParams): string {
   return JSON.stringify(params);
@@ -271,8 +271,9 @@ export async function searchAllJobs(params: JobSearchParams = {}): Promise<JobAp
   }
 
   if (API_CONFIG.joinrise.enabled) {
-    // Fetch multiple pages from JoinRise for better US job coverage
-    apiPromises.push(searchJoinRiseJobsMultiPage({ ...params, limit: 200 }, 10).catch(err => {
+    // Fetch multiple pages from JoinRise for maximum US job coverage
+    // JoinRise has 10,000+ US jobs - fetch 100 pages of 100 jobs each
+    apiPromises.push(searchJoinRiseJobsMultiPage({ ...params, limit: 10000 }, 100).catch(err => {
       console.error('JoinRise fetch failed:', err);
       return { jobs: [], total: 0, page: 1, totalPages: 0, source: 'joinrise' };
     }));

@@ -266,21 +266,34 @@ export async function searchJoinRiseJobs(params: JobSearchParams): Promise<JobAp
   }
 }
 
-// Fetch multiple pages for better coverage
-export async function searchJoinRiseJobsMultiPage(params: JobSearchParams, pages: number = 5): Promise<JobApiResponse> {
+// Fetch multiple pages for maximum coverage
+export async function searchJoinRiseJobsMultiPage(params: JobSearchParams, pages: number = 50): Promise<JobApiResponse> {
   try {
-    const limit = params.limit || 50;
+    const limit = params.limit || 5000;
     const allJobs: ExternalJob[] = [];
 
-    // Fetch multiple pages in parallel
-    const pagePromises = Array.from({ length: pages }, (_, i) =>
-      searchJoinRiseJobs({ ...params, page: i + 1, limit: 100 })
-    );
+    // Fetch pages in batches to avoid overwhelming the API
+    const batchSize = 10;
+    const batches = Math.ceil(pages / batchSize);
 
-    const results = await Promise.all(pagePromises);
+    for (let batch = 0; batch < batches; batch++) {
+      const startPage = batch * batchSize + 1;
+      const endPage = Math.min(startPage + batchSize, pages + 1);
 
-    for (const result of results) {
-      allJobs.push(...result.jobs);
+      const pagePromises = Array.from({ length: endPage - startPage }, (_, i) =>
+        searchJoinRiseJobs({ ...params, page: startPage + i, limit: 100 })
+      );
+
+      const results = await Promise.all(pagePromises);
+
+      for (const result of results) {
+        allJobs.push(...result.jobs);
+      }
+
+      // Stop if we've got enough jobs or no more results
+      if (allJobs.length >= limit) break;
+      const lastResult = results[results.length - 1];
+      if (lastResult.jobs.length === 0) break;
     }
 
     // Deduplicate by ID
@@ -288,14 +301,16 @@ export async function searchJoinRiseJobsMultiPage(params: JobSearchParams, pages
       new Map(allJobs.map(job => [job.id, job])).values()
     );
 
-    // Apply final limit
-    const paginatedJobs = uniqueJobs.slice(0, limit);
+    // Apply final limit only if specified and less than total
+    const finalJobs = limit > 0 ? uniqueJobs.slice(0, limit) : uniqueJobs;
+
+    console.log(`JoinRise: Fetched ${finalJobs.length} unique US jobs from ${pages} pages`);
 
     return {
-      jobs: paginatedJobs,
-      total: results[0]?.total || uniqueJobs.length,
+      jobs: finalJobs,
+      total: uniqueJobs.length,
       page: params.page || 1,
-      totalPages: Math.ceil((results[0]?.total || uniqueJobs.length) / limit),
+      totalPages: Math.ceil(uniqueJobs.length / (params.limit || 50)),
       source: 'joinrise',
     };
   } catch (error) {
