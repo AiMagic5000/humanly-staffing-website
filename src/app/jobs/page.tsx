@@ -597,10 +597,8 @@ export default function JobsPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.03 }}
                     >
-                      <a
-                        href={job.source === 'database' || job.source === 'internal' ? `/jobs/${job.externalId}` : job.applyUrl}
-                        target={job.source === 'database' || job.source === 'internal' ? '_self' : '_blank'}
-                        rel={job.source === 'database' || job.source === 'internal' ? '' : 'noopener noreferrer'}
+                      <Link
+                        href={`/jobs/${job.id}`}
                         className="block bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all duration-200 group"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -705,7 +703,7 @@ export default function JobsPage() {
                             </Button>
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     </motion.div>
                   ))}
                 </motion.div>

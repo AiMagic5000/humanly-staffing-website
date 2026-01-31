@@ -10,7 +10,8 @@ import {
   ArrowLeft,
   Share2,
   Heart,
-  CheckCircle
+  CheckCircle,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,13 +35,62 @@ interface JobData {
   benefits: string[];
   featured?: boolean;
   postedDate: string;
+  applyUrl?: string;  // External apply URL for external jobs
+  source?: string;    // Job source (database, joinrise, etc.)
+  skills?: string[];  // Skills from external jobs
+}
+
+// Fetch job from external API by ID
+async function getExternalJob(id: string): Promise<JobData | null> {
+  try {
+    // Get the base URL from environment or use relative URL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const response = await fetch(`${baseUrl}/api/jobs?limit=500`, {
+      next: { revalidate: 300 } // Cache for 5 minutes
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const job = data.jobs?.find((j: any) => j.id === id);
+
+    if (!job) return null;
+
+    return {
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      type: job.type,
+      salary: job.salary,
+      industry: job.industry || 'Other',
+      description: job.description || 'No description available.',
+      requirements: job.requirements || [],
+      benefits: job.benefits || [],
+      featured: job.featured || false,
+      postedDate: job.postedDate,
+      applyUrl: job.applyUrl,
+      source: job.source,
+      skills: job.skills || [],
+    };
+  } catch (error) {
+    console.error('Error fetching external job:', error);
+    return null;
+  }
 }
 
 async function getJob(id: string): Promise<JobData | null> {
+  // Check if this is an external job (prefixed with source like joinrise_, db_, etc.)
+  const isExternalJob = id.includes('_') && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+
+  if (isExternalJob) {
+    return getExternalJob(id);
+  }
+
   // Check mock data first
   const mockJob = jobs.find((j) => j.id === id);
   if (mockJob) {
-    return mockJob;
+    return { ...mockJob, applyUrl: `/jobs/${id}/apply`, source: 'internal' };
   }
 
   // Fetch from database
@@ -74,6 +124,8 @@ async function getJob(id: string): Promise<JobData | null> {
         benefits: humanlyJob.benefits || [],
         featured: humanlyJob.featured || false,
         postedDate: humanlyJob.created_at,
+        applyUrl: `/jobs/${humanlyJob.id}/apply`,
+        source: 'database',
       };
     }
 
@@ -104,6 +156,8 @@ async function getJob(id: string): Promise<JobData | null> {
             employerJob.benefits) : [],
         featured: employerJob.featured || false,
         postedDate: employerJob.created_at,
+        applyUrl: `/jobs/${employerJob.id}/apply`,
+        source: 'database',
       };
     }
   } catch (error) {
@@ -194,9 +248,17 @@ export default async function JobDetailPage({ params }: JobPageProps) {
                 <Share2 className="h-5 w-5 mr-2" />
                 Share
               </Button>
-              <Button asChild size="lg">
-                <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
-              </Button>
+              {job.source === 'database' || job.source === 'internal' ? (
+                <Button asChild size="lg">
+                  <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
+                </Button>
+              ) : (
+                <Button asChild size="lg">
+                  <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">
+                    Apply Now <ExternalLink className="h-4 w-4 ml-2" />
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -218,37 +280,59 @@ export default async function JobDetailPage({ params }: JobPageProps) {
             </Card>
 
             {/* Requirements */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Requirements</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {job.requirements.map((req, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-600">{req}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+            {job.requirements && job.requirements.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Requirements</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {job.requirements.map((req, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-600">{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Skills (for external jobs) */}
+            {job.skills && job.skills.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Skills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {job.skills.map((skill, index) => (
+                      <Badge key={index} variant="outline" className="text-sm py-1.5 px-3">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Benefits */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Benefits</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {job.benefits.map((benefit, index) => (
-                    <Badge key={index} variant="secondary" className="text-sm py-1.5 px-3">
-                      {benefit}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {job.benefits && job.benefits.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Benefits</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {job.benefits.map((benefit, index) => (
+                      <Badge key={index} variant="secondary" className="text-sm py-1.5 px-3">
+                        {benefit}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column - Sidebar */}
@@ -305,13 +389,25 @@ export default async function JobDetailPage({ params }: JobPageProps) {
                 <p className="mt-2 text-blue-100 text-sm">
                   Submit your application and take the next step in your career.
                 </p>
-                <Button
-                  asChild
-                  variant="secondary"
-                  className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
-                >
-                  <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
-                </Button>
+                {job.source === 'database' || job.source === 'internal' ? (
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
+                  >
+                    <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
+                  >
+                    <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">
+                      Apply on {job.source === 'joinrise' ? 'JoinRise' : 'Partner Site'} <ExternalLink className="h-4 w-4 ml-2" />
+                    </a>
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
