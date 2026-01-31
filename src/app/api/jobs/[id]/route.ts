@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabase";
 import { jobs as mockJobs } from "@/data/jobs";
+import { searchAllJobs } from "@/lib/job-apis/aggregator";
 
 // GET - Get a single job by ID
 export async function GET(
@@ -11,16 +12,37 @@ export async function GET(
   try {
     const { id } = await params;
 
+    // Check if this is an external job ID (has prefix like joinrise_, db_, etc.)
+    const isExternalJob = id.includes('_') && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+
+    if (isExternalJob) {
+      // Fetch from aggregated jobs
+      const response = await searchAllJobs({ limit: 500 });
+      const job = response.jobs.find(j => j.id === id);
+
+      if (job) {
+        return NextResponse.json({ success: true, job });
+      }
+
+      return NextResponse.json(
+        { success: false, error: "Job not found" },
+        { status: 404 }
+      );
+    }
+
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes("your-project");
 
     if (isSupabaseConfigured) {
+      // Handle db_ prefix for database jobs accessed via aggregator ID format
+      const dbId = id.startsWith('db_') ? id.replace('db_', '') : id;
+
       // First try humanly_jobs table (imported jobs)
       const { data: humanlyJob, error: humanlyError } = await supabaseAdmin
         .from("humanly_jobs")
         .select("*")
-        .eq("id", id)
+        .eq("id", dbId)
         .eq("status", "active")
         .single();
 
@@ -65,7 +87,7 @@ export async function GET(
             industry
           )
         `)
-        .eq("id", id)
+        .eq("id", dbId)
         .single();
 
       if (error) {
