@@ -256,15 +256,15 @@ export default function JobsPage() {
                 className="mt-6 flex flex-wrap justify-center gap-3 sm:gap-6"
               >
                 <div className="flex items-center gap-2 text-blue-100 text-xs sm:text-sm">
-                  <TrendingUp className="h-4 w-4" />
-                  <span>
-                    <strong className="text-white">{Object.keys(stats.bySource).length}</strong> job sources
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-100 text-xs sm:text-sm">
                   <Building2 className="h-4 w-4" />
                   <span>
                     <strong className="text-white">{Object.keys(stats.byIndustry).length}</strong> industries
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-100 text-xs sm:text-sm">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>
+                    <strong className="text-white">{Object.keys(stats.byType).length}</strong> job types
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-blue-100 text-xs sm:text-sm">
@@ -560,7 +560,7 @@ export default function JobsPage() {
             {loading && jobs.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 sm:py-20">
                 <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600 animate-spin mb-4" />
-                <p className="text-gray-500">Loading jobs from multiple sources...</p>
+                <p className="text-gray-500">Loading jobs...</p>
               </div>
             )}
 
@@ -636,9 +636,6 @@ export default function JobsPage() {
                                   Remote
                                 </Badge>
                               )}
-                              <span className={`text-xs px-2 py-0.5 rounded ${getSourceBadge(job.source)}`}>
-                                {job.source === 'internal' ? 'Direct' : job.source}
-                              </span>
                             </div>
 
                             {/* Job Title */}

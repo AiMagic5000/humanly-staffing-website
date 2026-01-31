@@ -10,8 +10,7 @@ import {
   ArrowLeft,
   Share2,
   Heart,
-  CheckCircle,
-  ExternalLink
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -248,17 +247,9 @@ export default async function JobDetailPage({ params }: JobPageProps) {
                 <Share2 className="h-5 w-5 mr-2" />
                 Share
               </Button>
-              {job.source === 'database' || job.source === 'internal' ? (
-                <Button asChild size="lg">
-                  <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
-                </Button>
-              ) : (
-                <Button asChild size="lg">
-                  <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">
-                    Apply Now <ExternalLink className="h-4 w-4 ml-2" />
-                  </a>
-                </Button>
-              )}
+              <Button asChild size="lg">
+                <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -389,25 +380,13 @@ export default async function JobDetailPage({ params }: JobPageProps) {
                 <p className="mt-2 text-blue-100 text-sm">
                   Submit your application and take the next step in your career.
                 </p>
-                {job.source === 'database' || job.source === 'internal' ? (
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
-                  >
-                    <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
-                  </Button>
-                ) : (
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
-                  >
-                    <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">
-                      Apply on {job.source === 'joinrise' ? 'JoinRise' : 'Partner Site'} <ExternalLink className="h-4 w-4 ml-2" />
-                    </a>
-                  </Button>
-                )}
+                <Button
+                  asChild
+                  variant="secondary"
+                  className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50"
+                >
+                  <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
+                </Button>
               </CardContent>
             </Card>
 
